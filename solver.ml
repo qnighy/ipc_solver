@@ -23,9 +23,16 @@ let debug_sequent name ant1 ant2 sucL sucR =
     Format.eprintf ";; ";
     List.iter (fun (x,_) -> Format.eprintf "%a, "
       (Term.pp_print_pterm empty_env 0) x) ant1;
-    Format.eprintf "|- (%a, %a)@."
-      (Term.pp_print_pterm empty_env 0) sucL
-      (Term.pp_print_pterm empty_env 0) sucR
+    begin match sucL with
+    | None ->
+        Format.eprintf "|- %a@."
+          (Term.pp_print_pterm empty_env 0) sucR
+    | Some sucLS ->
+        Format.eprintf " [%a -> %a], |- %a@."
+          (Term.pp_print_pterm empty_env 0) sucR
+          (Term.pp_print_pterm empty_env 0) sucLS
+          (Term.pp_print_pterm empty_env 0) sucR
+    end
   end else ()
 
 (* solve1: only use reversible rules *)
@@ -99,10 +106,11 @@ and solve1_internal_a1 anum pnum ant1 ant2 sucL sucR =
         ((PArrow (PArrow (t1,t2),PArrow (PArrow (t2,t1),t3)),anum)::ant1t)
         ant2 sucL sucR
   | (PArrow (POr (t1,t2),t3),ti) :: ant1t ->
+      let p = PVar pnum in
       solve1_internal_a1 (anum+3) (pnum+1) (
-          (PArrow (t1,PVar pnum),anum)::
-          (PArrow (t2,PVar pnum),anum+1)::
-          (PArrow (PVar pnum,t3),anum+2)::ant1t)
+          (PArrow (t1,p),anum)::
+          (PArrow (t2,p),anum+1)::
+          (PArrow (p,t3),anum+2)::ant1t)
         ant2 sucL sucR
   | ant1h :: ant1t ->
       solve1_internal_a1 anum pnum ant1t (ant1h::ant2) sucL sucR
@@ -137,8 +145,18 @@ and solve2_internal_s anum pnum ant sucL sucR =
   debug_sequent "2S" ant [] sucL sucR;
   begin match sucR with
   | POr (t1,t2) ->
-      solve1_internal_s anum pnum ant sucL t1 ||
-      solve1_internal_s anum pnum ant sucL t2
+      begin match sucL with
+      | None ->
+          solve1_internal_s anum pnum ant sucL t1 ||
+          solve1_internal_s anum pnum ant sucL t2
+      | Some sucLS ->
+          let p = PVar pnum in
+          let sp = Some p in
+          solve1_internal_s (anum+2) (pnum+1)
+            ((PArrow (t2,p),anum)::(PArrow (p,sucLS),anum+1)::ant) sp t1 ||
+          solve1_internal_s (anum+2) (pnum+1)
+            ((PArrow (t1,p),anum)::(PArrow (p,sucLS),anum+1)::ant) sp t2
+      end
   | _ -> false
   end || solve2_internal_a anum pnum ant [] sucL sucR
 
@@ -155,8 +173,15 @@ and solve2_internal_a anum pnum ant1 ant2 sucL sucR =
   | [] -> false
   | ant1h :: ant1t -> begin match ant1h with
       | PArrow (PArrow (t1,t2),t3),ti ->
-          solve1_internal_s (anum+2) pnum
-            ((PArrow (sucR,sucL),anum)::(t1,anum+1)::ant1t@ant2) t3 t2 &&
+          begin match sucL with
+          | None ->
+              solve1_internal_s (anum+1) pnum
+                ((t1,anum)::ant1t@ant2) (Some t3) t2
+          | Some sucLS ->
+              solve1_internal_s (anum+2) pnum
+                ((PArrow (sucR,sucLS),anum)::(t1,anum+1)::ant1t@ant2)
+                (Some t3) t2
+          end &&
           solve1_internal_s (anum+1) pnum
             ((t3,anum)::ant1t@ant2) sucL sucR
       | _ -> false
@@ -165,4 +190,4 @@ and solve2_internal_a anum pnum ant1 ant2 sucL sucR =
   end
 
 let solve pnum p =
-  solve1_internal_s 0 pnum [] PTop p
+  solve1_internal_s 0 pnum [] None p
