@@ -1,0 +1,8 @@
+*.cmi
+*.cmo
+._bcdi/
+._d/
+/lexer.ml
+/parser.ml
+/parser.mli
+/ipc_solver
