@@ -25,7 +25,7 @@ expression:
   | expression ARROW expression { PNArrow ($1,$3) }
   | expression OR expression { PNOr ($1,$3) }
   | expression AND expression { PNAnd ($1,$3) }
-  | NOT expression { PNNot $2 }
+  | NOT expression { PNArrow ($2,PNBot) }
   | TOP { PNTop }
   | BOT { PNBot }
 ;

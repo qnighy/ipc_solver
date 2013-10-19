@@ -5,6 +5,7 @@ SOURCES := \
 	term.ml \
 	parser.mly \
 	lexer.mll \
+	solver.ml \
 	main.ml
 
 RESULT := ipc_solver

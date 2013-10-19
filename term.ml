@@ -6,7 +6,6 @@ type pnterm =
   | PNArrow of pnterm * pnterm
   | PNOr of pnterm * pnterm
   | PNAnd of pnterm * pnterm
-  | PNNot of pnterm
   | PNTop
   | PNBot
 
@@ -22,6 +21,9 @@ let rec pp_print_pnterm pr ppf = function
         (pp_print_pnterm 4) t2;
       if pr < 5 then fprintf ppf ")";
       fprintf ppf "@]"
+  | PNArrow (t,PNBot) ->
+      fprintf ppf "@[~%a@]"
+        (pp_print_pnterm 1) t
   | PNArrow (t1,t2) ->
       fprintf ppf "@[";
       if pr < 4 then fprintf ppf "(";
@@ -46,9 +48,6 @@ let rec pp_print_pnterm pr ppf = function
         (pp_print_pnterm 3) t2;
       if pr < 3 then fprintf ppf ")";
       fprintf ppf "@]"
-  | PNNot t ->
-      fprintf ppf "@[~%a@]"
-        (pp_print_pnterm 1) t
   | PNTop ->
       fprintf ppf "True"
   | PNBot ->
@@ -60,7 +59,6 @@ type pterm =
   | PArrow of pterm * pterm
   | POr of pterm * pterm
   | PAnd of pterm * pterm
-  | PNot of pterm
   | PTop
   | PBot
 
@@ -70,6 +68,10 @@ type name_env = {
 }
 
 let new_name_env () = {
+  dict = Hashtbl.create 10;
+  reverse_dict = Hashtbl.create 100
+}
+let empty_env = {
   dict = Hashtbl.create 10;
   reverse_dict = Hashtbl.create 100
 }
@@ -97,7 +99,6 @@ let rec convert_name_impl env num = function
   | PNOr (t1,t2) ->
       POr (convert_name_impl env num t1,
         convert_name_impl env num t2)
-  | PNNot t -> PNot (convert_name_impl env num t)
   | PNTop -> PTop
   | PNBot -> PBot
 
@@ -122,6 +123,9 @@ let rec pp_print_pterm env pr ppf = function
         (pp_print_pterm env 4) t2;
       if pr < 5 then fprintf ppf ")";
       fprintf ppf "@]"
+  | PArrow (t,PBot) ->
+      fprintf ppf "@[~%a@]"
+        (pp_print_pterm env 1) t
   | PArrow (t1,t2) ->
       fprintf ppf "@[";
       if pr < 4 then fprintf ppf "(";
@@ -146,9 +150,6 @@ let rec pp_print_pterm env pr ppf = function
         (pp_print_pterm env 3) t2;
       if pr < 3 then fprintf ppf ")";
       fprintf ppf "@]"
-  | PNot t ->
-      fprintf ppf "@[~%a@]"
-        (pp_print_pterm env 1) t
   | PTop ->
       fprintf ppf "True"
   | PBot ->
