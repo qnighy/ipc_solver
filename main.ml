@@ -22,6 +22,7 @@ let () =
       let nd = Nj_proof.make_diagram npr in
 
       (* printf "%s@." "\\documentclass[preview]{standalone}"; *)
+      printf "%s@." "%solvable";
       printf "%s@." "\\documentclass[preview,varwidth=4000px]{standalone}";
       printf "%s@." "\\usepackage{bussproofs}";
       printf "%s@." "\\begin{document}";
@@ -30,6 +31,11 @@ let () =
         (Nj_proof.print_nj_diagram_latex env) nd;
       printf "%s@." "\\end{prooftree}";
       printf "%s@." "\\end{document}"
-  | None -> eprintf "solved: false@."
+  | None -> eprintf "solved: false@.";
+      printf "%s@." "%unsolvable";
+      printf "%s@." "\\documentclass[preview,varwidth=4000px]{standalone}";
+      printf "%s@." "\\begin{document}";
+      printf "%s@." "unsolvable";
+      printf "%s@." "\\end{document}"
   end
 
