@@ -465,13 +465,98 @@ let rec make_diagram_internal stack t =
   | _ -> raise (Invalid_argument "constructors cannot appear singly")
   end
 
-let make_diagram t = make_diagram_internal [] t
+let rec compress_diagram_internal1 d pd =
+  let result =
+  begin match pd with
+  | NJD_var p -> None
+  | NJD_app (p,d1,d2) ->
+      begin match compress_diagram_internal1 d d1 with
+      | Some k -> Some k
+      | None -> compress_diagram_internal1 d d2
+      end
+  | NJD_abs (p,d1) -> None
+  | NJD_tt p -> None
+  | NJD_ab (p,d1) ->
+      compress_diagram_internal1 d d1
+  | NJD_conj (p,d1,d2) ->
+      begin match compress_diagram_internal1 d d1 with
+      | Some k -> Some k
+      | None -> compress_diagram_internal1 d d2
+      end
+  | NJD_fst (p,d1) ->
+      compress_diagram_internal1 d d1
+  | NJD_snd (p,d1) ->
+      compress_diagram_internal1 d d1
+  | NJD_left (p,d1) ->
+      compress_diagram_internal1 d d1
+  | NJD_right (p,d1) ->
+      compress_diagram_internal1 d d1
+  | NJD_disj (p,d1,d2,d3) ->
+      begin match compress_diagram_internal1 d d1 with
+      | Some k -> Some k
+      | None ->
+          begin match compress_diagram_internal1 d d2 with
+          | Some k -> Some k
+          | None -> compress_diagram_internal1 d d3
+          end
+      end
+  end in
+  begin match result with
+  | Some k -> Some k
+  | None ->
+      if nj_diagram_type d = nj_diagram_type pd then
+        Some pd
+      else if nj_diagram_type pd = PBot then
+        Some (NJD_ab (nj_diagram_type d,pd))
+      else
+        None
+  end
+
+let rec compress_diagram_internal2 d =
+  let d =
+    begin match compress_diagram_internal1 d d with
+    | Some d -> d
+    | None -> d
+    end in
+  begin match d with
+  | NJD_var p -> d
+  | NJD_app (p,d1,d2) ->
+      NJD_app (p,
+        compress_diagram_internal2 d1,
+        compress_diagram_internal2 d2)
+  | NJD_abs (p,d1) ->
+      NJD_abs (p,compress_diagram_internal2 d1)
+  | NJD_tt p -> d
+  | NJD_ab (p,d1) ->
+      NJD_ab (p,compress_diagram_internal2 d1)
+  | NJD_conj (p,d1,d2) ->
+      NJD_conj (p,
+        compress_diagram_internal2 d1,
+        compress_diagram_internal2 d2)
+  | NJD_fst (p,d1) ->
+      NJD_fst (p,compress_diagram_internal2 d1)
+  | NJD_snd (p,d1) ->
+      NJD_snd (p,compress_diagram_internal2 d1)
+  | NJD_left (p,d1) ->
+      NJD_left (p,compress_diagram_internal2 d1)
+  | NJD_right (p,d1) ->
+      NJD_right (p,compress_diagram_internal2 d1)
+  | NJD_disj (p,d1,d2,d3) ->
+      NJD_disj (p,
+        compress_diagram_internal2 d1,
+        compress_diagram_internal2 d2,
+        compress_diagram_internal2 d3)
+  end
+
+let make_diagram t =
+  let d = make_diagram_internal [] t in
+  compress_diagram_internal2 d
 
 let rec print_nj_diagram_latex env ppf d =
   fprintf ppf "@[<1>";
   begin match d with
   | NJD_var p ->
-      fprintf ppf "\\AxiomC{%a}@,"
+      fprintf ppf "\\AxiomC{[%a]}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_app (p,d1,d2) ->
       fprintf ppf "%a%a\\BinaryInfC{%a}@,"
@@ -483,7 +568,7 @@ let rec print_nj_diagram_latex env ppf d =
         (print_nj_diagram_latex env) d1
         (pp_print_pterm_latex env 5) p
   | NJD_tt p ->
-      fprintf ppf "\\AxiomC{%a}@,"
+      fprintf ppf "\\AxiomC{}\\UnaryInfC{%a}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_ab (p,d1) ->
       fprintf ppf "%a\\UnaryInfC{%a}@,"

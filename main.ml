@@ -21,7 +21,8 @@ let () =
         Nj_proof.pp_print_lambda npr;
       let nd = Nj_proof.make_diagram npr in
 
-      printf "%s@." "\\documentclass[preview]{standalone}";
+      (* printf "%s@." "\\documentclass[preview]{standalone}"; *)
+      printf "%s@." "\\documentclass[preview,varwidth=4000px]{standalone}";
       printf "%s@." "\\usepackage{bussproofs}";
       printf "%s@." "\\begin{document}";
       printf "%s@." "\\begin{prooftree}";
