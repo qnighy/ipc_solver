@@ -9,8 +9,13 @@ let () =
   printf "Term is %a@." (pp_print_pnterm 5) tn;
   let (t,env,num) = convert_name tn in
   printf "Term is %a@." (pp_print_pterm env 5) t;
-  if Solver.solve num t then
-    printf "solved: true@."
-  else
-    printf "solved: false@."
+  begin match Solver.solve num t with
+  | Some pr ->
+      printf "solved: true@.";
+      printf "proof: %a@."
+        Lf_proof.pp_print_proofitem pr;
+      printf "proof:@,%a@."
+        (Lf_proof.pp_print_proof env num t) pr
+  | None -> printf "solved: false@."
+  end
 

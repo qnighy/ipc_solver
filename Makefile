@@ -6,6 +6,7 @@ SOURCES := \
 	parser.mly \
 	lexer.mll \
 	solver.ml \
+	lf_proof.ml \
 	main.ml
 
 RESULT := ipc_solver

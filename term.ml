@@ -2,10 +2,9 @@ open Format
 
 type pnterm =
   | PNVarName of string
-  | PNEquiv of pnterm * pnterm
-  | PNArrow of pnterm * pnterm
+  | PNArrow of pnterm * pnterm * bool (* true if it is ~A *)
   | PNOr of pnterm * pnterm
-  | PNAnd of pnterm * pnterm
+  | PNAnd of pnterm * pnterm * bool (* true if it is A <-> B *)
   | PNTop
   | PNBot
 
@@ -13,18 +12,10 @@ type pnterm =
 let rec pp_print_pnterm pr ppf = function
   | PNVarName s ->
       fprintf ppf "%s" s
-  | PNEquiv (t1,t2) ->
-      fprintf ppf "@[";
-      if pr < 5 then fprintf ppf "(";
-      fprintf ppf "%a@ <->@ %a"
-        (pp_print_pnterm 4) t1
-        (pp_print_pnterm 4) t2;
-      if pr < 5 then fprintf ppf ")";
-      fprintf ppf "@]"
-  | PNArrow (t,PNBot) ->
+  | PNArrow (t,PNBot,true) ->
       fprintf ppf "@[~%a@]"
         (pp_print_pnterm 1) t
-  | PNArrow (t1,t2) ->
+  | PNArrow (t1,t2,_) ->
       fprintf ppf "@[";
       if pr < 4 then fprintf ppf "(";
       fprintf ppf "%a@ ->@ %a"
@@ -32,7 +23,16 @@ let rec pp_print_pnterm pr ppf = function
         (pp_print_pnterm 4) t2;
       if pr < 4 then fprintf ppf ")";
       fprintf ppf "@]"
-  | PNAnd (t1,t2) ->
+  | PNAnd (PNArrow (t1,t2,_),PNArrow (t2t,t1t,_),true)
+        when t1=t1t && t2=t2t ->
+      fprintf ppf "@[";
+      if pr < 5 then fprintf ppf "(";
+      fprintf ppf "%a@ <->@ %a"
+        (pp_print_pnterm 4) t1
+        (pp_print_pnterm 4) t2;
+      if pr < 5 then fprintf ppf ")";
+      fprintf ppf "@]"
+  | PNAnd (t1,t2,_) ->
       fprintf ppf "@[";
       if pr < 2 then fprintf ppf "(";
       fprintf ppf "%a@ /\\@ %a"
@@ -55,10 +55,9 @@ let rec pp_print_pnterm pr ppf = function
 
 type pterm =
   | PVar of int
-  | PEquiv of pterm * pterm
-  | PArrow of pterm * pterm
+  | PArrow of pterm * pterm * bool
   | POr of pterm * pterm
-  | PAnd of pterm * pterm
+  | PAnd of pterm * pterm * bool
   | PTop
   | PBot
 
@@ -87,15 +86,16 @@ let rec convert_name_impl env num = function
         num := !num + 1;
         t
       end
-  | PNEquiv (t1,t2) ->
-      PEquiv (convert_name_impl env num t1,
-        convert_name_impl env num t2)
-  | PNArrow (t1,t2) ->
+  | PNArrow (t1,t2,isn) ->
       PArrow (convert_name_impl env num t1,
-        convert_name_impl env num t2)
-  | PNAnd (t1,t2) ->
+        convert_name_impl env num t2,isn)
+  | PNAnd (PNArrow (t1,t2,_),PNArrow(t2t,t1t,_),true) ->
+      let ct1 = convert_name_impl env num t1 in
+      let ct2 = convert_name_impl env num t2 in
+      PAnd (PArrow (ct1,ct2,false),PArrow(ct2,ct1,false),true)
+  | PNAnd (t1,t2,ise) ->
       PAnd (convert_name_impl env num t1,
-        convert_name_impl env num t2)
+        convert_name_impl env num t2,ise)
   | PNOr (t1,t2) ->
       POr (convert_name_impl env num t1,
         convert_name_impl env num t2)
@@ -115,18 +115,10 @@ let rec pp_print_pterm env pr ppf = function
       with Not_found ->
         fprintf ppf "?%d" n
       end
-  | PEquiv (t1,t2) ->
-      fprintf ppf "@[";
-      if pr < 5 then fprintf ppf "(";
-      fprintf ppf "%a@ <->@ %a"
-        (pp_print_pterm env 4) t1
-        (pp_print_pterm env 4) t2;
-      if pr < 5 then fprintf ppf ")";
-      fprintf ppf "@]"
-  | PArrow (t,PBot) ->
+  | PArrow (t,PBot,true) ->
       fprintf ppf "@[~%a@]"
         (pp_print_pterm env 1) t
-  | PArrow (t1,t2) ->
+  | PArrow (t1,t2,_) ->
       fprintf ppf "@[";
       if pr < 4 then fprintf ppf "(";
       fprintf ppf "%a@ ->@ %a"
@@ -134,7 +126,16 @@ let rec pp_print_pterm env pr ppf = function
         (pp_print_pterm env 4) t2;
       if pr < 4 then fprintf ppf ")";
       fprintf ppf "@]"
-  | PAnd (t1,t2) ->
+  | PAnd (PArrow (t1,t2,_),PArrow (t2t,t1t,_),true)
+        when t1=t1t && t2=t2t ->
+      fprintf ppf "@[";
+      if pr < 5 then fprintf ppf "(";
+      fprintf ppf "%a@ <->@ %a"
+        (pp_print_pterm env 4) t1
+        (pp_print_pterm env 4) t2;
+      if pr < 5 then fprintf ppf ")";
+      fprintf ppf "@]"
+  | PAnd (t1,t2,_) ->
       fprintf ppf "@[";
       if pr < 2 then fprintf ppf "(";
       fprintf ppf "%a@ /\\@ %a"
