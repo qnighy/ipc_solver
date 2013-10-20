@@ -80,10 +80,10 @@ let make_proof_or
 let rec solve1_internal_s anum pnum ant sucL sucR =
   debug_sequent "1S" ant [] sucL sucR;
   begin match sucR with
-  | PArrow (t1,t2,_) ->
+  | PArrow (t1,t2) ->
       make_proof (fun pr -> LF_RI pr)
         (solve1_internal_s (anum+1) pnum ((t1,anum)::ant) sucL t2)
-  | PAnd (t1,t2,_) ->
+  | PAnd (t1,t2) ->
       make_proof_and (fun pr1 pr2 -> LF_RC (pr1,pr2))
         (fun _ -> solve1_internal_s anum pnum ant sucL t1)
         (fun _ -> solve1_internal_s anum pnum ant sucL t2)
@@ -113,7 +113,7 @@ and solve1_internal_a1 anum pnum ant1 ant2 sucL sucR =
   debug_sequent "1A1" ant1 ant2 sucL sucR;
   begin match ant1 with
   | [] -> solve1_internal_a2 anum pnum ant2 [] sucL sucR
-  | (PAnd (t1,t2,_),ti) :: ant1t ->
+  | (PAnd (t1,t2),ti) :: ant1t ->
       make_proof (fun pr -> LF_LC (ti,pr))
       (solve1_internal_a1 (anum+2) pnum
         ((t1,anum)::(t2,anum+1)::ant1t) ant2 sucL sucR)
@@ -124,30 +124,30 @@ and solve1_internal_a1 anum pnum ant1 ant2 sucL sucR =
             ((t1,anum)::ant1t) ant2 sucL sucR)
         (fun _ ->
           solve1_internal_a1 (anum+1) pnum
-            ((t2,anum+1)::ant1t) ant2 sucL sucR)
+            ((t2,anum)::ant1t) ant2 sucL sucR)
   | (PTop,ti) :: ant1t ->
       make_proof (fun pr -> LF_LT (ti,pr))
         (solve1_internal_a1 anum pnum ant1t ant2 sucL sucR)
   | (PBot,ti) :: ant1t -> Some (LF_LB ti)
   | (PVar p,ti) :: ant1t when sucR = PVar p -> Some (LF_ax ti)
-  | (PArrow (PTop,t3,_),ti) :: ant1t ->
+  | (PArrow (PTop,t3),ti) :: ant1t ->
       make_proof (fun pr -> LF_LIT (ti,pr))
         (solve1_internal_a1 (anum+1) pnum
           ((t3,anum)::ant1t) ant2 sucL sucR)
-  | (PArrow (PBot,t3,_),ti) :: ant1t ->
+  | (PArrow (PBot,t3),ti) :: ant1t ->
       make_proof (fun pr -> LF_LIB (ti,pr))
         (solve1_internal_a1 anum pnum ant1t ant2 sucL sucR)
-  | (PArrow (PAnd (t1,t2,_),t3,_),ti) :: ant1t ->
+  | (PArrow (PAnd (t1,t2),t3),ti) :: ant1t ->
       make_proof (fun pr -> LF_LIC (ti,pr))
         (solve1_internal_a1 (anum+1) pnum
-          ((PArrow (t1,PArrow (t2,t3,false),false),anum)::ant1t) ant2 sucL sucR)
-  | (PArrow (POr (t1,t2),t3,_),ti) :: ant1t ->
+          ((PArrow (t1,PArrow (t2,t3)),anum)::ant1t) ant2 sucL sucR)
+  | (PArrow (POr (t1,t2),t3),ti) :: ant1t ->
       let p = PVar pnum in
       make_proof (fun pr -> LF_LID (ti,pr))
         (solve1_internal_a1 (anum+3) (pnum+1) (
-            (PArrow (t1,p,false),anum)::
-            (PArrow (t2,p,false),anum+1)::
-            (PArrow (p,t3,false),anum+2)::ant1t)
+            (PArrow (t1,p),anum)::
+            (PArrow (t2,p),anum+1)::
+            (PArrow (p,t3),anum+2)::ant1t)
           ant2 sucL sucR)
   | ant1h :: ant1t ->
       solve1_internal_a1 anum pnum ant1t (ant1h::ant2) sucL sucR
@@ -165,12 +165,12 @@ and solve1_internal_a2 anum pnum ant1 ant2 sucL sucR =
   debug_sequent "1A2" ant1 ant2 sucL sucR;
   begin match ant1 with
   | [] -> solve2_internal_s anum pnum ant2 sucL sucR
-  | (PArrow (PVar p,t3,_),ti) :: ant1t
+  | (PArrow (PVar p,t3),ti) :: ant1t
       when List.exists (fun (x,_) -> x = PVar p) ant1 ->
       let tj = snd (List.find (fun (x,_) -> x = PVar p) ant1) in
       make_proof (fun pr -> LF_LIP (ti,tj,pr))
         (solve1_internal_a1 (anum+1) pnum [(t3,anum)] (ant2@ant1t) sucL sucR)
-  | (PArrow (PVar p,t3,_),ti) :: ant1t
+  | (PArrow (PVar p,t3),ti) :: ant1t
       when List.exists (fun (x,_) -> x = PVar p) ant2 ->
       let tj = snd (List.find (fun (x,_) -> x = PVar p) ant2) in
       make_proof (fun pr -> LF_LIP (ti,tj,pr))
@@ -190,19 +190,19 @@ and solve2_internal_s anum pnum ant sucL sucR =
   | POr (t1,t2) ->
       begin match sucL with
       | None ->
-          make_proof_or (fun pr -> LF_RD1L pr) (fun pr -> LF_RD1R pr)
+          make_proof_or (fun pr -> LF_RDL pr) (fun pr -> LF_RDR pr)
             (fun _ -> solve1_internal_s anum pnum ant sucL t1)
             (fun _ -> solve1_internal_s anum pnum ant sucL t2)
       | Some sucLS ->
           let p = PVar pnum in
           let sp = Some p in
-          make_proof_or (fun pr -> LF_RD2L pr) (fun pr -> LF_RD2R pr)
+          make_proof_or (fun pr -> LF_RDL pr) (fun pr -> LF_RDR pr)
             (fun _ ->
               solve1_internal_s (anum+2) (pnum+1)
-                ((PArrow (t2,p,false),anum)::(PArrow (p,sucLS,false),anum+1)::ant) sp t1)
+                ((PArrow (t2,p),anum)::(PArrow (p,sucLS),anum+1)::ant) sp t1)
             (fun _ ->
               solve1_internal_s (anum+2) (pnum+1)
-                ((PArrow (t1,p,false),anum)::(PArrow (p,sucLS,false),anum+1)::ant) sp t2)
+                ((PArrow (t1,p),anum)::(PArrow (p,sucLS),anum+1)::ant) sp t2)
       end
   | _ -> solve2_internal_a anum pnum ant [] sucL sucR
   end
@@ -222,7 +222,7 @@ and solve2_internal_a anum pnum ant1 ant2 sucL sucR =
       make_proof_or (fun pr -> pr) (fun pr -> pr)
       (fun _ ->
       begin match ant1h with
-      | PArrow (PArrow (t1,t2,_),t3,_),ti ->
+      | PArrow (PArrow (t1,t2),t3),ti ->
           make_proof_and (fun pr1 pr2 -> LF_LII (ti,pr1,pr2))
           (fun _ ->
           begin match sucL with
@@ -231,7 +231,7 @@ and solve2_internal_a anum pnum ant1 ant2 sucL sucR =
                 ((t1,anum)::ant1t@ant2) (Some t3) t2
           | Some sucLS ->
               solve1_internal_s (anum+2) pnum
-                ((PArrow (sucR,sucLS,false),anum)::(t1,anum+1)::ant1t@ant2)
+                ((PArrow (sucR,sucLS),anum)::(t1,anum+1)::ant1t@ant2)
                 (Some t3) t2
           end)
           (fun _ ->

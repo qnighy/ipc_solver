@@ -24,12 +24,12 @@ expression:
   | expression EQUIV expression {
       let t1 = $1 in
       let t2 = $3 in
-      PNAnd (PNArrow (t1,t2,false),PNArrow (t2,t1,false),true)
+      PNAnd (PNArrow (t1,t2),PNArrow (t2,t1))
   }
-  | expression ARROW expression { PNArrow ($1,$3,false) }
+  | expression ARROW expression { PNArrow ($1,$3) }
   | expression OR expression { PNOr ($1,$3) }
-  | expression AND expression { PNAnd ($1,$3,false) }
-  | NOT expression { PNArrow ($2,PNBot,true) }
+  | expression AND expression { PNAnd ($1,$3) }
+  | NOT expression { PNArrow ($2,PNBot) }
   | TOP { PNTop }
   | BOT { PNBot }
 ;
