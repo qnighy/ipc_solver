@@ -46,20 +46,22 @@ loop do
   media = nil
   if system("bash ./twitter-make-image.sh #{tid}")
     tex = File.read("workdir/#{tid}.tex")
-    if tex.include?("%solvable")
+    if tex.include?("%provable")
       if File.exists?("workdir/#{tid}.png")
-        result = "solvable"
+        result = "Provable"
         media = "workdir/#{tid}.png"
       else
         result = "image generation failed"
       end
-    elsif tex.include?("%unsolvable")
-      result = "unsolvable"
+    elsif tex.include?("%unprovable")
+      result = "Unprovable"
+    elsif tex.include?("%parse_error")
+      result = "Parse Error"
     else
-      result = "determination failed"
+      result = "Determination failed"
     end
   else
-    result = "an error occured"
+    result = "An error occured"
   end
   result = "@#{target.user.screen_name} #{result} (#{rand(36**5).to_s(36)})"
   tw_option = {
