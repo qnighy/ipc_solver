@@ -50,7 +50,6 @@
 rule token =
   parse [' ' '\t' '\n'] { token lexbuf }
       | "(*" { in_comment lexbuf; token lexbuf }
-      | "T" { TOP }
       | (['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*) as id {
           try
             Hashtbl.find keyword_table id
@@ -86,10 +85,12 @@ rule token =
       | "⊥" { BOT }
       | "0" { BOT }
       | "1" { TOP }
+      | "⊤" { TOP }
       | "(" { LPAREN }
       | "（" { LPAREN }
       | ")" { RPAREN }
       | "）" { RPAREN }
+      | _ { STRAY }
       | eof { EOF }
 and in_comment =
   parse "(*" { in_comment lexbuf; in_comment lexbuf }

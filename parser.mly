@@ -5,6 +5,7 @@
 %token EOF
 %token LPAREN RPAREN
 %token ARROW EQUIV AND OR NOT BOT TOP
+%token STRAY
 %nonassoc EQUIV
 %right ARROW
 %right OR
