@@ -47,9 +47,9 @@ loop do
   if system("bash ./twitter-make-image.sh #{tid}")
     tex = File.read("workdir/#{tid}.tex")
     if tex.include?("%provable")
-      if File.exists?("workdir/#{tid}.png")
+      if File.exists?("workdir/#{tid}1.png")
         result = "Provable"
-        media = "workdir/#{tid}.png"
+        media = "workdir/#{tid}1.png"
       else
         result = "image generation failed"
       end
