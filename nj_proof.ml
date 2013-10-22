@@ -559,47 +559,58 @@ let rec print_nj_diagram_latex env ppf d =
       fprintf ppf "\\AxiomC{[%a]}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_app (p,d1,d2) ->
-      fprintf ppf "%a%a\\BinaryInfC{%a}@,"
-        (print_nj_diagram_latex env) d1
-        (print_nj_diagram_latex env) d2
+      print_nj_diagram_latex env ppf d1;
+      print_nj_diagram_latex env ppf d2;
+      fprintf ppf "\\RightLabel{\\scriptsize$\\to E$}@,";
+      fprintf ppf "\\BinaryInfC{%a}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_abs (p,d1) ->
-      fprintf ppf "%a\\UnaryInfC{%a}@,"
-        (print_nj_diagram_latex env) d1
+      print_nj_diagram_latex env ppf d1;
+      fprintf ppf "\\RightLabel{\\scriptsize$\\to I$}@,";
+      fprintf ppf "\\UnaryInfC{%a}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_tt p ->
-      fprintf ppf "\\AxiomC{}\\UnaryInfC{%a}@,"
+      fprintf ppf "\\AxiomC{}@,";
+      fprintf ppf "\\RightLabel{\\scriptsize$\\top I$}@,";
+      fprintf ppf "\\UnaryInfC{%a}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_ab (p,d1) ->
-      fprintf ppf "%a\\UnaryInfC{%a}@,"
-        (print_nj_diagram_latex env) d1
+      print_nj_diagram_latex env ppf d1;
+      fprintf ppf "\\RightLabel{\\scriptsize$\\bot E$}@,";
+      fprintf ppf "\\UnaryInfC{%a}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_conj (p,d1,d2) ->
-      fprintf ppf "%a%a\\BinaryInfC{%a}@,"
-        (print_nj_diagram_latex env) d1
-        (print_nj_diagram_latex env) d2
+      print_nj_diagram_latex env ppf d1;
+      print_nj_diagram_latex env ppf d2;
+      fprintf ppf "\\RightLabel{\\scriptsize$\\land I$}@,";
+      fprintf ppf "\\BinaryInfC{%a}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_fst (p,d1) ->
-      fprintf ppf "%a\\UnaryInfC{%a}@,"
-        (print_nj_diagram_latex env) d1
+      print_nj_diagram_latex env ppf d1;
+      fprintf ppf "\\RightLabel{\\scriptsize$\\land E_1$}@,";
+      fprintf ppf "\\UnaryInfC{%a}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_snd (p,d1) ->
-      fprintf ppf "%a\\UnaryInfC{%a}@,"
-        (print_nj_diagram_latex env) d1
+      print_nj_diagram_latex env ppf d1;
+      fprintf ppf "\\RightLabel{\\scriptsize$\\land E_2$}@,";
+      fprintf ppf "\\UnaryInfC{%a}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_left (p,d1) ->
-      fprintf ppf "%a\\UnaryInfC{%a}@,"
-        (print_nj_diagram_latex env) d1
+      print_nj_diagram_latex env ppf d1;
+      fprintf ppf "\\RightLabel{\\scriptsize$\\lor I_1$}@,";
+      fprintf ppf "\\UnaryInfC{%a}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_right (p,d1) ->
-      fprintf ppf "%a\\UnaryInfC{%a}@,"
-        (print_nj_diagram_latex env) d1
+      print_nj_diagram_latex env ppf d1;
+      fprintf ppf "\\RightLabel{\\scriptsize$\\lor I_2$}@,";
+      fprintf ppf "\\UnaryInfC{%a}@,"
         (pp_print_pterm_latex env 5) p
   | NJD_disj (p,d1,d2,d3) ->
-      fprintf ppf "%a%a%a\\TrinaryInfC{%a}@,"
-        (print_nj_diagram_latex env) d1
-        (print_nj_diagram_latex env) d2
-        (print_nj_diagram_latex env) d3
+      print_nj_diagram_latex env ppf d1;
+      print_nj_diagram_latex env ppf d2;
+      print_nj_diagram_latex env ppf d3;
+      fprintf ppf "\\RightLabel{\\scriptsize$\\lor E$}@,";
+      fprintf ppf "\\TrinaryInfC{%a}@,"
         (pp_print_pterm_latex env 5) p
   end;
   fprintf ppf "@]@,"
