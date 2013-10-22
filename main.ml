@@ -24,13 +24,12 @@ let () =
 
         (* printf "%s@." "\\documentclass[preview]{standalone}"; *)
         printf "%s@." "%provable";
-        printf "%s@." "\\documentclass[preview,varwidth=4000px]{standalone}";
+        printf "%s@." "\\documentclass[preview,varwidth=10000px]{standalone}";
         printf "%s@." "\\usepackage{bussproofs}";
+        printf "%s@." "\\usepackage{color}";
         printf "%s@." "\\begin{document}";
-        printf "%s@." "\\begin{prooftree}";
         printf "%a@."
           (Nj_proof.print_nj_diagram_latex env) nd;
-        printf "%s@." "\\end{prooftree}";
         printf "%s@." "\\end{document}"
     | None ->
         eprintf "solved. unprovable@.";

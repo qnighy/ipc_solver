@@ -552,66 +552,168 @@ let make_diagram t =
   let d = make_diagram_internal [] t in
   compress_diagram_internal2 d
 
-let rec print_nj_diagram_latex env ppf d =
-  fprintf ppf "@[<1>";
+type proof_tree =
+  | PTassumption of string
+  | PTaxiom of string * string
+  | PTunary of string * string * proof_tree
+  | PTbinary of string * string * proof_tree * proof_tree
+  | PTtrinary of string * string * proof_tree * proof_tree * proof_tree
+
+let pt_append s = function
+  | PTassumption p -> PTassumption (p^s)
+  | PTaxiom (p,r) -> PTaxiom (p^s,r)
+  | PTunary (p,r,t1) -> PTunary (p^s,r,t1)
+  | PTbinary (p,r,t1,t2) -> PTbinary (p^s,r,t1,t2)
+  | PTtrinary (p,r,t1,t2,t3) -> PTtrinary (p^s,r,t1,t2,t3)
+
+let pt_prop = function
+  | PTassumption p -> p
+  | PTaxiom (p,r) -> p
+  | PTunary (p,r,t1) -> p
+  | PTbinary (p,r,t1,t2) -> p
+  | PTtrinary (p,r,t1,t2,t3) -> p
+
+let rec print_proof_tree ppf pt =
+  begin match pt with
+  | PTassumption p ->
+      fprintf ppf "\\AxiomC{%s}@," p
+  | PTaxiom (p,r) ->
+      fprintf ppf "\\AxiomC{}@,";
+      fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
+      fprintf ppf "\\UnaryInfC{%s}@," p
+  | PTunary (p,r,t1) ->
+      print_proof_tree ppf t1;
+      fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
+      fprintf ppf "\\UnaryInfC{%s}@," p
+  | PTbinary (p,r,t1,t2) ->
+      print_proof_tree ppf t1;
+      print_proof_tree ppf t2;
+      fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
+      fprintf ppf "\\BinaryInfC{%s}@," p
+  | PTtrinary (p,r,t1,t2,t3) ->
+      print_proof_tree ppf t1;
+      print_proof_tree ppf t2;
+      print_proof_tree ppf t3;
+      fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
+      fprintf ppf "\\TrinaryInfC{%s}@," p
+  end
+
+let rec nj_diagram_to_proof_tree env d =
   begin match d with
   | NJD_var p ->
-      fprintf ppf "\\AxiomC{[%a]}@,"
-        (pp_print_pterm_latex env 5) p
+      PTassumption (
+        Misc.sprintf "[%a]"
+          (pp_print_pterm_latex env 5) p
+      )
   | NJD_app (p,d1,d2) ->
-      print_nj_diagram_latex env ppf d1;
-      print_nj_diagram_latex env ppf d2;
-      fprintf ppf "\\RightLabel{\\scriptsize$\\to E$}@,";
-      fprintf ppf "\\BinaryInfC{%a}@,"
-        (pp_print_pterm_latex env 5) p
+      PTbinary (
+        Misc.sprintf "%a"
+          (pp_print_pterm_latex env 5) p,
+        "$\\to E$",
+        nj_diagram_to_proof_tree env d1,
+        nj_diagram_to_proof_tree env d2
+      )
   | NJD_abs (p,d1) ->
-      print_nj_diagram_latex env ppf d1;
-      fprintf ppf "\\RightLabel{\\scriptsize$\\to I$}@,";
-      fprintf ppf "\\UnaryInfC{%a}@,"
-        (pp_print_pterm_latex env 5) p
+      PTunary (
+        Misc.sprintf "%a"
+          (pp_print_pterm_latex env 5) p,
+        "$\\to I$",
+        nj_diagram_to_proof_tree env d1
+      )
   | NJD_tt p ->
-      fprintf ppf "\\AxiomC{}@,";
-      fprintf ppf "\\RightLabel{\\scriptsize$\\top I$}@,";
-      fprintf ppf "\\UnaryInfC{%a}@,"
-        (pp_print_pterm_latex env 5) p
+      PTaxiom (
+        Misc.sprintf "%a"
+          (pp_print_pterm_latex env 5) p,
+        "$\\top I$"
+      )
   | NJD_ab (p,d1) ->
-      print_nj_diagram_latex env ppf d1;
-      fprintf ppf "\\RightLabel{\\scriptsize$\\bot E$}@,";
-      fprintf ppf "\\UnaryInfC{%a}@,"
-        (pp_print_pterm_latex env 5) p
+      PTunary (
+        Misc.sprintf "%a"
+          (pp_print_pterm_latex env 5) p,
+        "$\\bot E$",
+        nj_diagram_to_proof_tree env d1
+      )
   | NJD_conj (p,d1,d2) ->
-      print_nj_diagram_latex env ppf d1;
-      print_nj_diagram_latex env ppf d2;
-      fprintf ppf "\\RightLabel{\\scriptsize$\\land I$}@,";
-      fprintf ppf "\\BinaryInfC{%a}@,"
-        (pp_print_pterm_latex env 5) p
+      PTbinary (
+        Misc.sprintf "%a"
+          (pp_print_pterm_latex env 5) p,
+        "$\\land I$",
+        nj_diagram_to_proof_tree env d1,
+        nj_diagram_to_proof_tree env d2
+      )
   | NJD_fst (p,d1) ->
-      print_nj_diagram_latex env ppf d1;
-      fprintf ppf "\\RightLabel{\\scriptsize$\\land E_1$}@,";
-      fprintf ppf "\\UnaryInfC{%a}@,"
-        (pp_print_pterm_latex env 5) p
+      PTunary (
+        Misc.sprintf "%a"
+          (pp_print_pterm_latex env 5) p,
+        "$\\land E_1$",
+        nj_diagram_to_proof_tree env d1
+      )
   | NJD_snd (p,d1) ->
-      print_nj_diagram_latex env ppf d1;
-      fprintf ppf "\\RightLabel{\\scriptsize$\\land E_2$}@,";
-      fprintf ppf "\\UnaryInfC{%a}@,"
-        (pp_print_pterm_latex env 5) p
+      PTunary (
+        Misc.sprintf "%a"
+          (pp_print_pterm_latex env 5) p,
+        "$\\land E_2$",
+        nj_diagram_to_proof_tree env d1
+      )
   | NJD_left (p,d1) ->
-      print_nj_diagram_latex env ppf d1;
-      fprintf ppf "\\RightLabel{\\scriptsize$\\lor I_1$}@,";
-      fprintf ppf "\\UnaryInfC{%a}@,"
-        (pp_print_pterm_latex env 5) p
+      PTunary (
+        Misc.sprintf "%a"
+          (pp_print_pterm_latex env 5) p,
+        "$\\lor I_1$",
+        nj_diagram_to_proof_tree env d1
+      )
   | NJD_right (p,d1) ->
-      print_nj_diagram_latex env ppf d1;
-      fprintf ppf "\\RightLabel{\\scriptsize$\\lor I_2$}@,";
-      fprintf ppf "\\UnaryInfC{%a}@,"
-        (pp_print_pterm_latex env 5) p
+      PTunary (
+        Misc.sprintf "%a"
+          (pp_print_pterm_latex env 5) p,
+        "$\\lor I_2$",
+        nj_diagram_to_proof_tree env d1
+      )
   | NJD_disj (p,d1,d2,d3) ->
-      print_nj_diagram_latex env ppf d1;
-      print_nj_diagram_latex env ppf d2;
-      print_nj_diagram_latex env ppf d3;
-      fprintf ppf "\\RightLabel{\\scriptsize$\\lor E$}@,";
-      fprintf ppf "\\TrinaryInfC{%a}@,"
-        (pp_print_pterm_latex env 5) p
-  end;
-  fprintf ppf "@]@,"
+      PTtrinary (
+        Misc.sprintf "%a"
+          (pp_print_pterm_latex env 5) p,
+        "$\\lor E$",
+        nj_diagram_to_proof_tree env d1,
+        nj_diagram_to_proof_tree env d2,
+        nj_diagram_to_proof_tree env d3
+      )
+  end
 
+let proof_tree_threshold = 40
+
+let numberstr number = "\\ \\textcolor{red}{("^string_of_int number^")}"
+let rec split_proof_tree trees number pt =
+  begin match pt with
+  | PTassumption p -> (pt,1,trees,number)
+  | PTaxiom (p,r) -> (pt,1,trees,number)
+  | PTunary (p,r,t1) ->
+      let (t1s,t1n,trees,number) = split_proof_tree2 trees number t1 in
+      (PTunary (p,r,t1s),t1n+1,trees,number)
+  | PTbinary (p,r,t1,t2) ->
+      let (t1s,t1n,trees,number) = split_proof_tree2 trees number t1 in
+      let (t2s,t2n,trees,number) = split_proof_tree2 trees number t2 in
+      (PTbinary (p,r,t1s,t2s),t1n+t2n+1,trees,number)
+  | PTtrinary (p,r,t1,t2,t3) ->
+      let (t1s,t1n,trees,number) = split_proof_tree2 trees number t1 in
+      let (t2s,t2n,trees,number) = split_proof_tree2 trees number t2 in
+      let (t3s,t3n,trees,number) = split_proof_tree2 trees number t3 in
+      (PTtrinary (p,r,t1s,t2s,t3s),t1n+t2n+t3n+1,trees,number)
+  end
+and split_proof_tree2 trees number pt =
+  let (pts,ptn,trees,number) = split_proof_tree trees number pt in
+  if ptn > proof_tree_threshold then
+    (PTassumption (pt_prop pts ^ (numberstr number)),
+    1,pt_append (numberstr number) pts::trees,number+1)
+  else
+    (pts,ptn,trees,number)
+
+let print_nj_diagram_latex env ppf d =
+  let pt = nj_diagram_to_proof_tree env d in
+  let (pts,_,trees,_) = split_proof_tree [] 1 pt in
+  let trees = pts::trees in
+  List.iter (fun x ->
+    fprintf ppf "%s@." "\\begin{prooftree}";
+    fprintf ppf "%a@." print_proof_tree x;
+    fprintf ppf "%s@.@." "\\end{prooftree}"
+  ) (List.rev trees);
