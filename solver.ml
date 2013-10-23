@@ -196,7 +196,7 @@ and solve1_internal_a2 anum pnum ant1 ant2 sucL sucR =
  *)
 and solve2_internal_s anum pnum ant sucL sucR =
   debug_sequent "2S" ant [] sucL sucR;
-  begin match sucR with
+  let or_result = begin match sucR with
   | POr (t1,t2) ->
       begin match sucL with
       | None ->
@@ -214,7 +214,11 @@ and solve2_internal_s anum pnum ant sucL sucR =
               solve1_internal_s (anum+2) (pnum+1)
                 ((PArrow (t1,p),anum)::(PArrow (p,sucLS),anum+1)::ant) sp t2)
       end
-  | _ -> solve2_internal_a anum pnum ant [] sucL sucR
+  | _ -> None
+  end in
+  begin match or_result with
+  | Some pr -> or_result
+  | None -> solve2_internal_a anum pnum ant [] sucL sucR
   end
 
 (*
