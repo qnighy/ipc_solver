@@ -29,13 +29,14 @@ loop do
   end
   if !target
     p ["polling mentions"]
-    sleep 60
+    sleep 30
     next
   end
   p ["processing", target.id]
   tid = target.id
   prop = target.text
   prop.gsub!(/@[a-zA-Z0-9_]+/,"")
+  prop.gsub!(/^[.]/,"")
   prop.gsub!("&lt;","<")
   prop.gsub!("&gt;",">")
   prop.gsub!("&amp;","&")
