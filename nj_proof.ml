@@ -128,8 +128,13 @@ let rec count_fv v t =
 
 let rec reduce t =
   begin match t with
-  | NJ_var (p,x) -> t
-  | NJ_app (_,NJ_abs (_,_,ta),s) -> reduce (subst 0 ta s)
+  | NJ_var (p,x) -> reduce2 t
+  | NJ_app (p,t1,t2) ->
+      let rt2 = reduce t2 in
+      begin match reduce t1 with
+      | NJ_abs (_,_,ta) -> reduce (subst 0 ta rt2)
+      | rt1 -> reduce2 (NJ_app (p,rt1,rt2))
+      end
   | NJ_abs (p,pa,ta) -> reduce2 (NJ_abs (p,pa,reduce ta))
   | NJ_tt -> NJ_tt
   | NJ_ab (p,t1) -> reduce2 (NJ_ab (p,reduce t1))
@@ -139,7 +144,6 @@ let rec reduce t =
   | NJ_left (p,t1) -> reduce2 (NJ_left (p,reduce t1))
   | NJ_right (p,t1) -> reduce2 (NJ_right (p,reduce t1))
   | NJ_disj (p,t1,t2,t3) -> reduce2 (NJ_disj (p,reduce t1,reduce t2,reduce t3))
-  | _ -> reduce2 t
   end
 and reduce2 t =
   begin match t with
