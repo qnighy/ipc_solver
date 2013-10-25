@@ -3,150 +3,233 @@ open Format
 open Lf_proof
 
 type nj_proof =
-  | NJ_var of int
-  | NJ_app of nj_proof * nj_proof
-  | NJ_abs of pterm * nj_proof
+  | NJ_var of pterm * int
+  | NJ_app of pterm * nj_proof * nj_proof
+  | NJ_abs of pterm * pterm * nj_proof
   | NJ_tt (* True *)
-  | NJ_ab of pterm (* False -> A *)
-  | NJ_conj (* A -> B -> A /\ B *)
-  | NJ_fst (* A /\ B -> A *)
-  | NJ_snd (* A /\ B -> B *)
-  | NJ_left of pterm (* A -> A \/ B *)
-  | NJ_right of pterm (* B -> A \/ B *)
-  | NJ_disj (* A \/B -> (A -> C) -> (B -> C) -> C *)
+  | NJ_ab of pterm * nj_proof (* False -> A *)
+  | NJ_conj of pterm * nj_proof * nj_proof (* A -> B -> A /\ B *)
+  | NJ_fst of pterm * nj_proof (* A /\ B -> A *)
+  | NJ_snd of pterm * nj_proof(* A /\ B -> B *)
+  | NJ_left of pterm * nj_proof (* A -> A \/ B *)
+  | NJ_right of pterm * nj_proof (* B -> A \/ B *)
+  | NJ_disj of pterm * nj_proof * nj_proof * nj_proof (* A \/B -> (A -> C) -> (B -> C) -> C *)
 
-let make_app t1 t2 = NJ_app (t1,t2)
-let make_ab p t1 = NJ_app (NJ_ab p,t1)
-let make_conj t1 t2 = NJ_app (NJ_app (NJ_conj,t1),t2)
-let make_fst t1 = NJ_app (NJ_fst,t1)
-let make_snd t1 = NJ_app (NJ_snd,t1)
-let make_left p t1 = NJ_app (NJ_left p,t1)
-let make_right p t1 = NJ_app (NJ_right p,t1)
-let make_disj t1 t2 t3 = NJ_app (NJ_app (NJ_app (NJ_disj,t1),t2),t3)
-let destruct_abs t =
-  begin match t with
-  | NJ_abs (_,ta) -> ta
-  | _ -> raise (Invalid_argument "t is not a lambda-abstraction")
-  end
+let nj_type = function
+  | NJ_var (p,_) -> p
+  | NJ_app (p,_,_) -> p
+  | NJ_abs (p,_,_) -> p
+  | NJ_tt -> PTop
+  | NJ_ab (p,_) -> p
+  | NJ_conj (p,_,_) -> p
+  | NJ_fst (p,_) -> p
+  | NJ_snd (p,_) -> p
+  | NJ_left (p,_) -> p
+  | NJ_right (p,_) -> p
+  | NJ_disj (p,_,_,_) -> p
 
-let rec pp_print_lambda ppf = function
-  | NJ_var x ->
-      fprintf ppf "@[<1>%d@]@," x
-  | NJ_app (t1,t2) ->
-      fprintf ppf "@[<1>%a@ (%a)@]@,"
-        pp_print_lambda t1
-        pp_print_lambda t2
-  | NJ_abs (p,ta) ->
-      fprintf ppf "@[<1>\\:%a.@ %a@]@,"
-        (pp_print_pterm empty_env 0) p
-        pp_print_lambda ta
+let abs_over p t = NJ_abs (PArrow (p,nj_type t),p,t)
+
+let rec pp_print_lambda env ppf = function
+  | NJ_var (p,x) ->
+      fprintf ppf "@[<1>(%d@ :@ %a)@]@," x
+        (pp_print_pterm env 0) p
+  | NJ_app (p,t1,t2) ->
+      fprintf ppf "@[<1>(%a@ %a@ :@ %a)@]@,"
+        (pp_print_lambda env) t1
+        (pp_print_lambda env) t2
+        (pp_print_pterm env 0) p
+  | NJ_abs (p,pa,ta) ->
+      fprintf ppf "@[<1>(\\:%a.@ %a@ :@ %a)@]@,"
+        (pp_print_pterm env 0) pa
+        (pp_print_lambda env) ta
+        (pp_print_pterm env 0) p
   | NJ_tt -> fprintf ppf "@[<1>tt@]@,"
-  | NJ_ab p ->
-      fprintf ppf "@[<1>ab[%a]@]@,"
-        (pp_print_pterm empty_env 0) p
-  | NJ_conj -> fprintf ppf "@[<1>conj@]@,"
-  | NJ_fst -> fprintf ppf "@[<1>fst@]@,"
-  | NJ_snd -> fprintf ppf "@[<1>snd@]@,"
-  | NJ_left p -> fprintf ppf "@[<1>left[%a]@]@,"
-        (pp_print_pterm empty_env 0) p
-  | NJ_right p -> fprintf ppf "@[<1>right[%a]@]@,"
-        (pp_print_pterm empty_env 0) p
-  | NJ_disj -> fprintf ppf "@[<1>disj@]@,"
+  | NJ_ab (p,t1) ->
+      fprintf ppf "@[<1>([ab]@ %a@ :@ %a)@]@,"
+        (pp_print_lambda env) t1
+        (pp_print_pterm env 0) p
+  | NJ_conj (p,t1,t2) ->
+      fprintf ppf "@[<1>([conj]@ %a %a@ :@ %a)@]@,"
+        (pp_print_lambda env) t1
+        (pp_print_lambda env) t2
+        (pp_print_pterm env 0) p
+  | NJ_fst (p,t1) ->
+      fprintf ppf "@[<1>([fst]@ %a@ :@ %a)@]@,"
+        (pp_print_lambda env) t1
+        (pp_print_pterm env 0) p
+  | NJ_snd (p,t1) ->
+      fprintf ppf "@[<1>([snd]@ %a@ :@ %a)@]@,"
+        (pp_print_lambda env) t1
+        (pp_print_pterm env 0) p
+  | NJ_left (p,t1) ->
+      fprintf ppf "@[<1>([left]@ %a@ :@ %a)@]@,"
+        (pp_print_lambda env) t1
+        (pp_print_pterm env 0) p
+  | NJ_right (p,t1) ->
+      fprintf ppf "@[<1>([right]@ %a@ :@ %a)@]@,"
+        (pp_print_lambda env) t1
+        (pp_print_pterm env 0) p
+  | NJ_disj (p,t1,t2,t3) ->
+      fprintf ppf "@[<1>([disj]@ %a@ %a@ %a@ :@ %a)@]@,"
+        (pp_print_lambda env) t1
+        (pp_print_lambda env) t2
+        (pp_print_lambda env) t3
+        (pp_print_pterm env 0) p
 
 let rec shift i j t =
   begin match t with
-  | NJ_var x when x >= i -> NJ_var (x+j)
-  | NJ_app (t1,t2) -> NJ_app (shift i j t1,shift i j t2)
-  | NJ_abs (p,ta) -> NJ_abs (p,shift (i+1) j ta)
-  | _ -> t
+  | NJ_var (p,x) when x >= i -> NJ_var (p,x+j)
+  | NJ_var (_,_) -> t
+  | NJ_app (p,t1,t2) -> NJ_app (p,shift i j t1,shift i j t2)
+  | NJ_abs (p,pa,ta) -> NJ_abs (p,pa,shift (i+1) j ta)
+  | NJ_tt -> NJ_tt
+  | NJ_ab (p,t1) -> NJ_ab (p,shift i j t1)
+  | NJ_conj (p,t1,t2) -> NJ_conj (p,shift i j t1,shift i j t2)
+  | NJ_fst (p,t1) -> NJ_fst (p,shift i j t1)
+  | NJ_snd (p,t1) -> NJ_snd (p,shift i j t1)
+  | NJ_left (p,t1) -> NJ_left (p,shift i j t1)
+  | NJ_right (p,t1) -> NJ_right (p,shift i j t1)
+  | NJ_disj (p,t1,t2,t3) -> NJ_disj (p,shift i j t1,shift i j t2,shift i j t3)
   end
 
 let rec subst d t s =
   begin match t with
-  | NJ_var x when x = d -> shift 0 d s
-  | NJ_var x when x > d -> NJ_var (x-1)
-  | NJ_app (t1,t2) -> NJ_app (subst d t1 s,subst d t2 s)
-  | NJ_abs (p,ta) -> NJ_abs (p,subst (d+1) ta s)
-  | _ -> t
+  | NJ_var (_,x) when x = d -> shift 0 d s
+  | NJ_var (p,x) when x > d -> NJ_var (p,x-1)
+  | NJ_var (_,_) -> t
+  | NJ_app (p,t1,t2) -> NJ_app (p,subst d t1 s,subst d t2 s)
+  | NJ_abs (p,pa,ta) -> NJ_abs (p,pa,subst (d+1) ta s)
+  | NJ_tt -> NJ_tt
+  | NJ_ab (p,t1) -> NJ_ab (p,subst d t1 s)
+  | NJ_conj (p,t1,t2) -> NJ_conj (p,subst d t1 s,subst d t2 s)
+  | NJ_fst (p,t1) -> NJ_fst (p,subst d t1 s)
+  | NJ_snd (p,t1) -> NJ_snd (p,subst d t1 s)
+  | NJ_left (p,t1) -> NJ_left (p,subst d t1 s)
+  | NJ_right (p,t1) -> NJ_right (p,subst d t1 s)
+  | NJ_disj (p,t1,t2,t3) -> NJ_disj (p,subst d t1 s,subst d t2 s,subst d t3 s)
+  end
+
+let rec count_fv v t =
+  begin match t with
+  | NJ_var (_,x) when x = v -> 1
+  | NJ_var (_,_) -> 0
+  | NJ_app (_,t1,t2) -> count_fv v t1 + count_fv v t2
+  | NJ_abs (_,_,ta) -> count_fv (v+1) ta
+  | NJ_tt -> 0
+  | NJ_ab (_,t1) -> count_fv v t1
+  | NJ_conj (_,t1,t2) -> count_fv v t1 + count_fv v t2
+  | NJ_fst (_,t1) -> count_fv v t1
+  | NJ_snd (_,t1) -> count_fv v t1
+  | NJ_left (_,t1) -> count_fv v t1
+  | NJ_right (_,t1) -> count_fv v t1
+  | NJ_disj (_,t1,t2,t3) -> count_fv v t1 + count_fv v t2 + count_fv v t3
   end
 
 let rec reduce t =
   begin match t with
-  | NJ_app (NJ_abs (_,ta),s) -> reduce (subst 0 ta s)
-  | NJ_abs (p,ta) -> NJ_abs (p,reduce ta)
-  | NJ_app (t1,t2) ->
-      let rt1 = reduce t1 in
-      let rt2 = reduce t2 in
-      begin match rt1,rt2 with
-      | NJ_abs (_,ta), s -> reduce (subst 0 ta s)
-      | NJ_fst, NJ_app (NJ_app (NJ_conj,a),b) -> a
-      | NJ_snd, NJ_app (NJ_app (NJ_conj,a),b) -> b
-      | NJ_app (NJ_app (NJ_disj,NJ_app (NJ_left p,a)),ac),bc ->
-          NJ_app (ac,a)
-      | NJ_app (NJ_app (NJ_disj,NJ_app (NJ_right p,b)),ac),bc ->
-          NJ_app (bc,b)
-      | _,_ -> NJ_app (rt1,rt2)
-      end
-  | _ -> t
+  | NJ_var (p,x) -> t
+  | NJ_app (_,NJ_abs (_,_,ta),s) -> reduce (subst 0 ta s)
+  | NJ_abs (p,pa,ta) -> reduce2 (NJ_abs (p,pa,reduce ta))
+  | NJ_tt -> NJ_tt
+  | NJ_ab (p,t1) -> reduce2 (NJ_ab (p,reduce t1))
+  | NJ_conj (p,t1,t2) -> reduce2 (NJ_conj (p,reduce t1,reduce t2))
+  | NJ_fst (p,t1) -> reduce2 (NJ_fst (p,reduce t1))
+  | NJ_snd (p,t1) -> reduce2 (NJ_snd (p,reduce t1))
+  | NJ_left (p,t1) -> reduce2 (NJ_left (p,reduce t1))
+  | NJ_right (p,t1) -> reduce2 (NJ_right (p,reduce t1))
+  | NJ_disj (p,t1,t2,t3) -> reduce2 (NJ_disj (p,reduce t1,reduce t2,reduce t3))
+  | _ -> reduce2 t
   end
-
-let rec replace_type_type v s p =
-  begin match p with
-  | PVar x when x = v -> s
-  | PArrow (p1,p2) -> PArrow (
-      replace_type_type v s p1,
-      replace_type_type v s p2)
-  | POr (p1,p2) -> POr (
-      replace_type_type v s p1,
-      replace_type_type v s p2)
-  | PAnd (p1,p2) -> PAnd (
-      replace_type_type v s p1,
-      replace_type_type v s p2)
-  | _ -> p
-  end
-
-let rec replace_type v s t =
+and reduce2 t =
   begin match t with
-  | NJ_app (t1,t2) -> NJ_app (
-      replace_type v s t1,
-      replace_type v s t2)
-  | NJ_abs (p,ta) -> NJ_abs (
-      replace_type_type v s p,
-      replace_type v s ta)
-  | NJ_ab p -> NJ_ab (replace_type_type v s p)
-  | NJ_left p -> NJ_left (replace_type_type v s p)
-  | NJ_right p -> NJ_right (replace_type_type v s p)
+  | NJ_abs (_,_,NJ_app (_,t1,NJ_var (_,0)))
+      when count_fv 0 t1 = 0 -> shift 0 (-1) t1
+  | NJ_fst (_,NJ_conj (_,t1,_)) -> t1
+  | NJ_snd (_,NJ_conj (_,_,t2)) -> t2
+  | NJ_disj (p,NJ_left (_,t1),t2,_) -> reduce (NJ_app (p,t2,t1))
+  | NJ_disj (p,NJ_right (_,t1),_,t3) -> reduce (NJ_app (p,t3,t1))
+  | NJ_disj (p,t1,NJ_abs (_,_,t2),_) when count_fv 0 t2 = 0 -> shift 0 (-1) t2
+  | NJ_disj (p,t1,_,NJ_abs (_,_,t3)) when count_fv 0 t3 = 0 -> shift 0 (-1) t3
+  | NJ_conj (p,NJ_fst (_,t1),NJ_snd (_,t2)) when t1 = t2 -> t1
   | _ -> t
   end
 
-let rec convert_lf_internal anum pnum ant sucL sucR pr =
+let rec convert_lf_internal anum ant sucL sucR pr =
   let debug_data = (* debug *)
+  let suc =
+    begin match sucL with
+    | None -> sucR
+    | Some sucLS -> PArrow (PArrow (sucR,sucLS),sucR)
+    end in
   begin match pr with
   | LF_ax x ->
       begin match sucL with
-      | None -> NJ_var (anum-1-x)
-      | Some sucLS -> NJ_abs (PArrow (sucR,sucLS),NJ_var (anum-1-x+1))
+      | None -> NJ_var (sucR,anum-1-x)
+      | Some sucLS ->
+          let sucRL = PArrow (sucR,sucLS) in
+          NJ_abs (PArrow (sucRL,sucR),sucRL,NJ_var (sucR,anum-1-x+1))
       end
   | LF_RT -> NJ_tt
   | LF_RC (pr1,pr2) ->
       begin match sucR with
       | PAnd (t1,t2) ->
-          let lt1 = convert_lf_internal anum pnum ant sucL t1 pr1 in
-          let lt2 = convert_lf_internal anum pnum ant sucL t2 pr2 in
+          let lt1 = convert_lf_internal anum ant sucL t1 pr1 in
+          let lt2 = convert_lf_internal anum ant sucL t2 pr2 in
           begin match sucL with
-          | None -> make_conj lt1 lt2
-          | Some sucLS -> reduce (NJ_abs (PArrow (sucR,sucLS),make_conj
-              (make_app (shift 0 1 lt1) (NJ_abs (t1,make_app (NJ_var 1)
-                (make_conj (NJ_var 0) (make_app (shift 0 2 lt2) (NJ_abs
-                  (t2,make_app (NJ_var 2) (make_conj (NJ_var 1) (NJ_var 0)))
-                )))
-              )))
-              (make_app (shift 0 1 lt2) (NJ_abs (t2,make_app (NJ_var 1)
-                (make_conj (make_app (shift 0 2 lt1) (NJ_abs
-                  (t1,make_app (NJ_var 2) (make_conj (NJ_var 0) (NJ_var 1)))
-                )) (NJ_var 0))
-              )))
-            ))
+          | None -> NJ_conj (sucR,lt1,lt2)
+          | Some sucLS ->
+              let sucRL = PArrow (sucR,sucLS) in
+              NJ_abs (PArrow (sucRL,sucR),sucRL, (* f : sucR -> sucLS *)
+                NJ_conj (sucR,
+                  NJ_app (t1,
+                    shift 0 1 lt1,
+                    NJ_abs (PArrow (t1,sucLS),t1, (* x : t1 *)
+                      NJ_app (sucLS,
+                        NJ_var (sucRL,1), (* f *)
+                        NJ_conj (sucR,
+                          NJ_var (t1,0), (* x *)
+                          NJ_app (t2,
+                            shift 0 2 lt2,
+                            NJ_abs (PArrow (t2,sucLS),t2, (* y : t2 *)
+                              NJ_app (sucLS,
+                                NJ_var (sucRL,2), (* f *)
+                                NJ_conj (sucR,
+                                  NJ_var (t1,1), (* x *)
+                                  NJ_var (t2,0) (* y *)
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  ),
+                  NJ_app (t2,
+                    shift 0 1 lt2,
+                    NJ_abs (PArrow (t2,sucLS),t2, (* y : t2 *)
+                      NJ_app (sucLS,
+                        NJ_var (sucRL,1), (* f *)
+                        NJ_conj (sucR,
+                          NJ_app (t1,
+                            shift 0 2 lt1,
+                            NJ_abs (PArrow (t1,sucLS),t1, (* x : t1 *)
+                              NJ_app (sucLS,
+                                NJ_var (sucRL,2), (* f *)
+                                NJ_conj (sucR,
+                                  NJ_var (t1,0), (* x *)
+                                  NJ_var (t2,1) (* y *)
+                                )
+                              )
+                            )
+                          ),
+                          NJ_var (t2,0) (* y *)
+                        )
+                      )
+                    )
+                  )
+                )
+              )
           end
       | _ -> raise (Invalid_argument "LF_RC given, but not PAnd")
       end
@@ -155,22 +238,37 @@ let rec convert_lf_internal anum pnum ant sucL sucR pr =
       | POr (t1,t2) ->
           begin match sucL with
           | None ->
-              let lt = convert_lf_internal anum pnum ant sucL t1 pr in
-              make_left t2 lt
+              let lt = convert_lf_internal anum ant sucL t1 pr in
+              NJ_left (sucR,lt)
           | Some sucLS ->
-              let p = PVar pnum in
-              let lt = convert_lf_internal (anum+2) (pnum+1)
-                ((PArrow (t2,p),anum)::(PArrow (p,sucLS),anum+1)::ant)
-                (Some p) t1 pr in
-              let lt = NJ_abs (PArrow (t2,p),NJ_abs (PArrow (p,sucLS),lt)) in
-              let lt = replace_type pnum (POr (t1,t2)) lt in
-              reduce (NJ_abs (PArrow (sucR,sucLS),make_left t2
-                (make_app (make_app (make_app (shift 0 1 lt)
-                  (NJ_abs (t1,make_left t2 (NJ_var 0))))
-                  (NJ_var 0))
-                  (NJ_abs (t2,make_right t1 (NJ_var 0)))
+              let sucRL = PArrow (sucR,sucLS) in
+              let paramT1 = PArrow (t2,sucR) in
+              let ltt = PArrow (PArrow (t1,sucR),t1) in
+              let lt = convert_lf_internal (anum+2)
+                ((paramT1,anum)::(sucRL,anum+1)::ant) (Some sucR) t1 pr in
+              let lt = abs_over paramT1 (abs_over sucRL lt) in
+              NJ_abs (PArrow(sucRL,sucR),sucRL, (* f : sucR -> sucLS *)
+                NJ_left (sucR,
+                  NJ_app (t1,
+                    NJ_app (ltt,
+                      NJ_app (PArrow (sucRL,ltt),
+                        shift 0 1 lt,
+                        NJ_abs (PArrow (t2,sucR),t2, (* y : t2 *)
+                          NJ_right (sucR,
+                            NJ_var (t2,0) (* y *)
+                          )
+                        )
+                      ),
+                      NJ_var (sucRL,0) (* f *)
+                    ),
+                    NJ_abs (PArrow(t1,sucR),t1, (* x : t1 *)
+                      NJ_left (sucR,
+                        NJ_var (t1,0) (* x *)
+                      )
+                    )
+                  )
                 )
-              ))
+              )
           end
       | _ -> raise (Invalid_argument "LF_RDL given, but not POr")
       end
@@ -179,22 +277,37 @@ let rec convert_lf_internal anum pnum ant sucL sucR pr =
       | POr (t1,t2) ->
           begin match sucL with
           | None ->
-              let lt = convert_lf_internal anum pnum ant sucL t2 pr in
-              make_right t1 lt
+              let lt = convert_lf_internal anum ant sucL t1 pr in
+              NJ_right (sucR,lt)
           | Some sucLS ->
-              let p = PVar pnum in
-              let lt = convert_lf_internal (anum+2) (pnum+1)
-                ((PArrow (t1,p),anum)::(PArrow (p,sucLS),anum+1)::ant)
-                (Some p) t2 pr in
-              let lt = NJ_abs (PArrow (t1,p),NJ_abs (PArrow (p,sucLS),lt)) in
-              let lt = replace_type pnum (POr (t1,t2)) lt in
-              reduce (NJ_abs (PArrow (sucR,sucLS),make_right t2
-                (make_app (make_app (make_app (shift 0 1 lt)
-                  (NJ_abs (t2,make_right t1 (NJ_var 0))))
-                  (NJ_var 0))
-                  (NJ_abs (t1,make_left t2 (NJ_var 0)))
+              let sucRL = PArrow (sucR,sucLS) in
+              let paramT1 = PArrow (t1,sucR) in
+              let ltt = PArrow (PArrow (t2,sucR),t2) in
+              let lt = convert_lf_internal (anum+2)
+                ((paramT1,anum)::(sucRL,anum+1)::ant) (Some sucR) t2 pr in
+              let lt = abs_over paramT1 (abs_over sucRL lt) in
+              NJ_abs (PArrow(sucRL,sucR),sucRL, (* f : sucR -> sucLS *)
+                NJ_right (sucR,
+                  NJ_app (t2,
+                    NJ_app (ltt,
+                      NJ_app (PArrow (sucRL,ltt),
+                        shift 0 1 lt,
+                        NJ_abs (PArrow (t1,sucR),t1, (* x : t1 *)
+                          NJ_right (sucR,
+                            NJ_var (t1,0) (* x *)
+                          )
+                        )
+                      ),
+                      NJ_var (sucRL,0) (* f *)
+                    ),
+                    NJ_abs (PArrow(t2,sucR),t2, (* y : t2 *)
+                      NJ_left (sucR,
+                        NJ_var (t2,0) (* y *)
+                      )
+                    )
+                  )
                 )
-              ))
+              )
           end
       | _ -> raise (Invalid_argument "LF_RDR given, but not POr")
       end
@@ -202,39 +315,52 @@ let rec convert_lf_internal anum pnum ant sucL sucR pr =
       begin match sucR with
       | PArrow (t1,t2) ->
           let lt =
-            convert_lf_internal (anum+1) pnum ((t1,anum)::ant) sucL t2 pr in
+            convert_lf_internal (anum+1) ((t1,anum)::ant) sucL t2 pr in
+          let lt = abs_over t1 lt in
           begin match sucL with
-          | None -> NJ_abs (t1,lt)
-          | Some sucLS -> reduce (
-              NJ_abs (PArrow (sucR,sucLS),NJ_abs (t1,
-                make_app (make_app (shift 0 2 (NJ_abs (t1,lt))) (NJ_var 0))
-                  (NJ_abs (t2,make_app (NJ_var 2) (NJ_abs (t1,NJ_var 1))))
-              ))
-            )
+          | None -> lt
+          | Some sucLS ->
+              let sucRL = PArrow (sucR,sucLS) in
+              NJ_abs (PArrow (sucRL,sucR),sucRL, (* f : sucR -> sucLS *)
+                NJ_abs (sucR,t1, (* g : t1 *)
+                  NJ_app (t2,
+                    NJ_app (PArrow(PArrow (t2,sucLS),t2),
+                      shift 0 2 lt,
+                      NJ_var (t1,0) (* g *)
+                    ),
+                    NJ_abs (PArrow (t2,sucLS),t2, (* y : t2 *)
+                      NJ_app (sucLS,
+                        NJ_var (sucRL,2), (* f *)
+                        NJ_abs (sucR,t1, (* _ : t1 *)
+                          NJ_var (t2,1) (* y *)
+                        )
+                      )
+                    )
+                  )
+                )
+              )
           end
       | _ -> raise (Invalid_argument "LF_RI given, but not PArrow")
       end
   | LF_LT (x,pr) ->
       let (ant0,t,ant1) = cutAnt ant x in
-      convert_lf_internal anum pnum (ant0@ant1) sucL sucR pr
+      convert_lf_internal anum (ant0@ant1) sucL sucR pr
   | LF_LB x ->
-      begin match sucL with
-      | None -> make_ab sucR (NJ_var (anum-1-x))
-      | Some sucLS ->
-          make_ab
-          (PArrow (PArrow (sucR,sucLS),sucR))
-          (NJ_var (anum-1-x))
-      end
+      NJ_ab (suc,NJ_var (PBot,anum-1-x))
   | LF_LC (x,pr) ->
       let (ant0,t,ant1) = cutAnt ant x in
       begin match t with
       | PAnd (t1,t2) ->
-          let lt = convert_lf_internal (anum+2) pnum
+          let lt = convert_lf_internal (anum+2)
             (ant0@(t1,anum)::(t2,anum+1)::ant1) sucL sucR pr in
-          let lt = NJ_abs (t1,NJ_abs (t2,lt)) in
-          let var = NJ_var (anum-1-x) in
-          reduce (
-            make_app (make_app lt (make_fst var)) (make_snd var)
+          let lt = abs_over t1 (abs_over t2 lt) in
+          let var = NJ_var (t,anum-1-x) in
+          NJ_app (suc,
+            NJ_app (PArrow (t2,suc),
+              lt,
+              NJ_fst (t1,var)
+            ),
+            NJ_snd (t2,var)
           )
       | _ -> raise (Invalid_argument "LF_LC given, but not PAnd")
       end
@@ -242,14 +368,16 @@ let rec convert_lf_internal anum pnum ant sucL sucR pr =
       let (ant0,t,ant1) = cutAnt ant x in
       begin match t with
       | POr (t1,t2) ->
-          let lt1 = convert_lf_internal (anum+1) pnum
+          let lt1 = convert_lf_internal (anum+1)
             (ant0@(t1,anum)::ant1) sucL sucR pr1 in
-          let lt2 = convert_lf_internal (anum+1) pnum
+          let lt2 = convert_lf_internal (anum+1)
             (ant0@(t2,anum)::ant1) sucL sucR pr2 in
-          reduce (make_disj
-            (NJ_var (anum-1-x))
-            (NJ_abs (t1,lt1))
-            (NJ_abs (t2,lt2))
+          let lt1 = abs_over t1 lt1 in
+          let lt2 = abs_over t2 lt2 in
+          NJ_disj (suc,
+            NJ_var (t,anum-1-x),
+            lt1,
+            lt2
           )
       | _ -> raise (Invalid_argument "LF_LD given, but not POr")
       end
@@ -257,24 +385,32 @@ let rec convert_lf_internal anum pnum ant sucL sucR pr =
       let (ant0,t,ant1) = cutAnt ant x in
       begin match t with
       | PArrow (_,t2) ->
-          let lt = convert_lf_internal (anum+1) pnum
+          let lt = convert_lf_internal (anum+1)
             (ant0@(t2,anum)::ant1) sucL sucR pr in
-          let var = NJ_var (anum-1-x) in
-          reduce (make_app (NJ_abs (t2,lt)) (make_app var NJ_tt))
+          let lt = abs_over t2 lt in
+          let var = NJ_var (t,anum-1-x) in
+          NJ_app (suc,
+            lt,
+            NJ_app (t2,var,NJ_tt)
+          )
       | _ -> raise (Invalid_argument "LF_LIT given, but not PArrow")
       end
   | LF_LIB (x,pr) ->
       let (ant0,t,ant1) = cutAnt ant x in
-      convert_lf_internal anum pnum (ant0@ant1) sucL sucR pr
+      convert_lf_internal anum (ant0@ant1) sucL sucR pr
   | LF_LIP (x,y,pr) ->
       let (ant0,t,ant1) = cutAnt ant x in
       begin match t with
-      | PArrow (_,t2) ->
-          let lt = convert_lf_internal (anum+1) pnum
+      | PArrow (t1,t2) ->
+          let lt = convert_lf_internal (anum+1)
             (ant0@(t2,anum)::ant1) sucL sucR pr in
-          let var1 = NJ_var (anum-1-x) in
-          let var2 = NJ_var (anum-1-y) in
-          reduce (make_app (NJ_abs (t2,lt)) (make_app var1 var2))
+          let lt = abs_over t2 lt in
+          let var1 = NJ_var (t,anum-1-x) in
+          let var2 = NJ_var (t1,anum-1-y) in
+          NJ_app (suc,
+            lt,
+            NJ_app (t2,var1,var2)
+          )
       | _ -> raise (Invalid_argument "LF_LIP given, but not PArrow")
       end
   | LF_LIC (x,pr) ->
@@ -282,78 +418,127 @@ let rec convert_lf_internal anum pnum ant sucL sucR pr =
       begin match t with
       | PArrow (PAnd (t1,t2),t3) ->
           let atype = PArrow (t1,PArrow (t2,t3)) in
-          let lt = convert_lf_internal (anum+1) pnum
+          let lt = convert_lf_internal (anum+1)
             (ant0@(atype,anum)::ant1)
             sucL sucR pr in
-          reduce (make_app (NJ_abs (atype,lt)) (
-            NJ_abs (t1,NJ_abs (t2,
-              make_app (NJ_var (anum-1-x+2)) (make_conj (NJ_var 1) (NJ_var 0))
-            ))
-          ))
+          let lt = abs_over atype lt in
+          NJ_app (suc,
+            lt,
+            NJ_abs (atype,t1, (* x : t1 *)
+              NJ_abs (PArrow (t2,t3),t2, (* y : t2 *)
+                NJ_app (t3,
+                  NJ_var (t,anum-1-x+2),
+                  NJ_conj (PAnd (t1,t2),
+                    NJ_var (t1,1), (* x *)
+                    NJ_var (t2,0) (* y *)
+                  )
+                )
+              )
+            )
+          )
       | _ -> raise (Invalid_argument "LF_LIC given, but not PAnd")
       end
   | LF_LID (x,pr) ->
       let (ant0,t,ant1) = cutAnt ant x in
-      let p = PVar pnum in
       begin match t with
-      | PArrow (POr (t1,t2),t3) ->
-          let lt = convert_lf_internal (anum+3) (pnum+1) (ant0@
-            (PArrow (t1,p),anum)::
-            (PArrow (t2,p),anum+1)::
-            (PArrow (p,t3),anum+2)::
+      | PArrow (POr (t1,t2) as t12,t3) ->
+          let paramT1 = PArrow (t1,t12) in
+          let paramT2 = PArrow (t2,t12) in
+          let lt = convert_lf_internal (anum+3) (ant0@
+            (paramT1,anum)::
+            (paramT2,anum+1)::
+            (t,anum+2)::
           ant1) sucL sucR pr in
-          let lt = NJ_abs (PArrow (t1,p),NJ_abs (PArrow (t2,p),
-            NJ_abs (PArrow (p,t3),lt))) in
-          let lt = replace_type pnum (POr (t1,t2)) lt in
-          reduce (make_app (make_app (make_app lt
-            (NJ_abs (t1,make_left t2 (NJ_var 0))))
-            (NJ_abs (t2,make_right t1 (NJ_var 0))))
-            (NJ_var (anum-1-x))
+          let lt = abs_over paramT1 (abs_over paramT2 (abs_over t lt)) in
+          NJ_app (suc,
+            NJ_app (PArrow (t,suc),
+              NJ_app (PArrow (paramT2,PArrow (t,suc)),
+                lt,
+                NJ_abs (paramT1,t1,
+                  NJ_left (t12,NJ_var (t1,0))
+                )
+              ),
+              NJ_abs (paramT2,t2,
+                NJ_right (t12,NJ_var (t2,0))
+              )
+            ),
+            NJ_var (t,anum-1-x)
           )
       | _ -> raise (Invalid_argument "LF_LID given, but not PArrow-POr")
       end
   | LF_LII (x,pr1,pr2) ->
       let (ant0,t,ant1) = cutAnt ant x in
-      let p = PVar pnum in
       begin match t with
-      | PArrow (PArrow (t1,t2),t3) ->
+      | PArrow (PArrow (t1,t2) as t12,t3) ->
           begin match sucL with
           | None ->
-              let lt1 = convert_lf_internal (anum+1) pnum
+              let lt1 = convert_lf_internal (anum+1)
                 (ant0@(t1,anum)::ant1) (Some t3) t2 pr1 in
-              let lt2 = (convert_lf_internal (anum+1) pnum
+              let lt2 = (convert_lf_internal (anum+1)
                 (ant0@(t3,anum)::ant1) sucL sucR) pr2 in
-              reduce (make_app (NJ_abs (t3,lt2)) (make_app (NJ_var (anum-1-x))
-                (NJ_abs (t1,make_app
-                  (make_app (shift 0 1 (NJ_abs (t1,lt1))) (NJ_var 0))
-                  (NJ_abs (t2,make_app
-                    (NJ_var (anum-1-x+2))
-                    (NJ_abs (t1,NJ_var 1))
-                  ))
-                ))
-              ))
+              let lt1 = abs_over t1 lt1 in
+              let lt2 = abs_over t3 lt2 in
+              NJ_app (sucR,
+                lt2,
+                NJ_app (t3,
+                  NJ_var (t,anum-1-x),
+                  NJ_abs (t12,t1, (* x : t1 *)
+                    NJ_app (t2,
+                      NJ_app (PArrow (PArrow (t2,t3),t2),
+                        shift 0 1 lt1,
+                        NJ_var (t1,0) (* x *)
+                      ),
+                      NJ_abs (PArrow (t2,t3),t2, (* _ : t2 *)
+                        NJ_app (t3,
+                          NJ_var (t,anum-1-x+2),
+                          NJ_abs (t12,t1,
+                            NJ_var (t1,1) (* x *)
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
           | Some sucLS ->
               let atype = PArrow (sucR,sucLS) in
-              let lt1 = convert_lf_internal (anum+2) pnum
+              let lt1 = convert_lf_internal (anum+2)
                 (ant0@(atype,anum)::(t1,anum+1)::ant1)
                 (Some t3) t2 pr1 in
-              let lt2 = (convert_lf_internal (anum+1) pnum
+              let lt2 = (convert_lf_internal (anum+1)
                 (ant0@(t3,anum)::ant1) sucL sucR) pr2 in
-              reduce (NJ_abs (atype,make_app (
-                make_app (shift 0 1 (NJ_abs (t3,lt2))) (make_app (NJ_var (anum-1-x+1))
-                  (NJ_abs (t1,make_app
-                    (make_app
-                      (make_app (shift 0 2 (NJ_abs (atype,NJ_abs (t1,lt1))))
-                      (NJ_var 1))
-                      (NJ_var 0)
+              let lt1 = abs_over atype (abs_over t1 lt1) in
+              let lt2 = abs_over t3 lt2 in
+              NJ_abs (suc,atype, (* f : sucR -> sucLS *)
+                NJ_app (sucR,
+                  NJ_app (suc,
+                    shift 0 1 lt2,
+                    NJ_app (t3,
+                      NJ_var (t,anum-1-x+1),
+                      NJ_abs (t12,t1, (* x : t1 *)
+                        NJ_app (t2,
+                          NJ_app (PArrow (PArrow (t2,t3),t2),
+                            NJ_app (PArrow (t1,PArrow (PArrow (t2,t3),t2)),
+                              shift 0 2 lt1,
+                              NJ_var (atype,1) (* f *)
+                            ),
+                            NJ_var (t1,0) (* x *)
+                          ),
+                          NJ_abs (PArrow (t2,t3),t2, (* y : t2 *)
+                            NJ_app (t3,
+                              NJ_var (t,anum-1-x+3),
+                              NJ_abs (t12,t1, (* _ : t1 *)
+                                NJ_var (t2,1) (* y *)
+                              )
+                            )
+                          )
+                        )
+                      )
                     )
-                    (NJ_abs (t2,make_app
-                      (NJ_var (anum-1-x+3))
-                      (NJ_abs (t1,NJ_var 1))
-                    ))
-                  ))
+                  ),
+                  NJ_var (atype,0) (* f *)
                 )
-              ) (NJ_var 0)))
+              )
           end
       | _ -> raise (Invalid_argument "LF_LII given, but not PArrow-PArrow")
       end
@@ -376,181 +561,101 @@ let rec convert_lf_internal anum pnum ant sucL sucR pr =
         (pp_print_pterm empty_env 0) sucLS
         (pp_print_pterm empty_env 0) sucR
   end;
-  eprintf "proof = %a@," (pp_print_proof_internal empty_env anum pnum ant sucL
+  eprintf "proof = %a@," (pp_print_proof_internal empty_env anum 100 ant sucL
   sucR) pr;
-  eprintf "output : %a@." pp_print_lambda debug_data;
+  eprintf "output : %a@." (pp_print_lambda empty_env) debug_data;
   debug_data
 
-let convert_lf pnum sucR pr =
-  convert_lf_internal 0 pnum [] None sucR pr
+let convert_lf sucR pr =
+  convert_lf_internal 0 [] None sucR pr
 
-type nj_diagram =
-  | NJD_var of pterm
-  | NJD_app of pterm * nj_diagram * nj_diagram
-  | NJD_abs of pterm * nj_diagram
-  | NJD_tt of pterm
-  | NJD_ab of pterm * nj_diagram
-  | NJD_conj of pterm * nj_diagram * nj_diagram
-  | NJD_fst of pterm * nj_diagram
-  | NJD_snd of pterm * nj_diagram
-  | NJD_left of pterm * nj_diagram
-  | NJD_right of pterm * nj_diagram
-  | NJD_disj of pterm * nj_diagram * nj_diagram * nj_diagram
-
-let nj_diagram_type = function
-  | NJD_var p -> p
-  | NJD_app (p,_,_) -> p
-  | NJD_abs (p,_) -> p
-  | NJD_tt p -> p
-  | NJD_ab (p,_) -> p
-  | NJD_conj (p,_,_) -> p
-  | NJD_fst (p,_) -> p
-  | NJD_snd (p,_) -> p
-  | NJD_left (p,_) -> p
-  | NJD_right (p,_) -> p
-  | NJD_disj (p,_,_,_) -> p
-
-
-let rec make_diagram_internal stack t =
-  begin match t with
-  | NJ_tt -> NJD_tt PTop
-  | NJ_app (NJ_ab p0,t1) ->
-      let d1 = make_diagram_internal stack t1 in
-      NJD_ab (p0,d1)
-  | NJ_app (NJ_app (NJ_conj,t1),t2) ->
-      let d1 = make_diagram_internal stack t1 in
-      let d2 = make_diagram_internal stack t2 in
-      NJD_conj (PAnd (nj_diagram_type d1,nj_diagram_type d2),d1,d2)
-  | NJ_app (NJ_fst,t1) ->
-      let d1 = make_diagram_internal stack t1 in
-      begin match nj_diagram_type d1 with
-      | PAnd (p1,p2) -> NJD_fst (p1,d1)
-      | _ -> raise (Invalid_argument "PAnd required")
-      end
-  | NJ_app (NJ_snd,t1) ->
-      let d1 = make_diagram_internal stack t1 in
-      begin match nj_diagram_type d1 with
-      | PAnd (p1,p2) -> NJD_snd (p2,d1)
-      | _ -> raise (Invalid_argument "PAnd required")
-      end
-  | NJ_app (NJ_left p,t1) ->
-      let d1 = make_diagram_internal stack t1 in
-      NJD_left (POr (nj_diagram_type d1,p),d1)
-  | NJ_app (NJ_right p,t1) ->
-      let d1 = make_diagram_internal stack t1 in
-      NJD_left (POr (p,nj_diagram_type d1),d1)
-  | NJ_app (NJ_app (NJ_app (NJ_disj,t1),t2),t3) ->
-      let d1 = make_diagram_internal stack t1 in
-      let d2 = make_diagram_internal stack t2 in
-      let d3 = make_diagram_internal stack t3 in
-      begin match nj_diagram_type d3 with
-      | PArrow (p1,p2) -> NJD_disj (p2,d1,d2,d3)
-      | _ -> raise (Invalid_argument "PArrow required")
-      end
-  | NJ_var x -> NJD_var (List.nth stack x)
-  | NJ_app (t1,t2) ->
-      let d1 = make_diagram_internal stack t1 in
-      let d2 = make_diagram_internal stack t2 in
-      eprintf "t1 = %a@." (pp_print_lambda) t1;
-      eprintf "d1 = %a@." (pp_print_pterm empty_env 0) (nj_diagram_type d1);
-      eprintf "t2 = %a@." (pp_print_lambda) t2;
-      eprintf "d2 = %a@." (pp_print_pterm empty_env 0) (nj_diagram_type d2);
-      begin match nj_diagram_type d1 with
-      | PArrow (p1,p2) -> NJD_app (p2,d1,d2)
-      | _ -> raise (Invalid_argument "PArrow required")
-      end
-  | NJ_abs (pa,ta) ->
-      let da = make_diagram_internal (pa::stack) ta in
-      NJD_abs (PArrow (pa,nj_diagram_type da),da)
-  | _ -> raise (Invalid_argument "constructors cannot appear singly")
-  end
-
-let rec compress_diagram_internal1 d pd =
+let rec compress_proof_internal1 p t =
   let result =
-  begin match pd with
-  | NJD_var p -> None
-  | NJD_app (p,d1,d2) ->
-      begin match compress_diagram_internal1 d d1 with
+  begin match t with
+  | NJ_var (_,_) -> None
+  | NJ_app (_,t1,t2) ->
+      begin match compress_proof_internal1 p t1 with
       | Some k -> Some k
-      | None -> compress_diagram_internal1 d d2
+      | None -> compress_proof_internal1 p t2
       end
-  | NJD_abs (p,d1) -> None
-  | NJD_tt p -> None
-  | NJD_ab (p,d1) ->
-      compress_diagram_internal1 d d1
-  | NJD_conj (p,d1,d2) ->
-      begin match compress_diagram_internal1 d d1 with
+  | NJ_abs (_,_,ta) -> None
+  | NJ_tt -> None
+  | NJ_ab (_,t1) ->
+      compress_proof_internal1 p t1
+  | NJ_conj (_,t1,t2) ->
+      begin match compress_proof_internal1 p t1 with
       | Some k -> Some k
-      | None -> compress_diagram_internal1 d d2
+      | None -> compress_proof_internal1 p t2
       end
-  | NJD_fst (p,d1) ->
-      compress_diagram_internal1 d d1
-  | NJD_snd (p,d1) ->
-      compress_diagram_internal1 d d1
-  | NJD_left (p,d1) ->
-      compress_diagram_internal1 d d1
-  | NJD_right (p,d1) ->
-      compress_diagram_internal1 d d1
-  | NJD_disj (p,d1,d2,d3) ->
-      begin match compress_diagram_internal1 d d1 with
+  | NJ_fst (_,t1) ->
+      compress_proof_internal1 p t1
+  | NJ_snd (_,t1) ->
+      compress_proof_internal1 p t1
+  | NJ_left (_,t1) ->
+      compress_proof_internal1 p t1
+  | NJ_right (_,t1) ->
+      compress_proof_internal1 p t1
+  | NJ_disj (_,t1,t2,t3) ->
+      begin match compress_proof_internal1 p t1 with
       | Some k -> Some k
       | None ->
-          begin match compress_diagram_internal1 d d2 with
+          begin match compress_proof_internal1 p t2 with
           | Some k -> Some k
-          | None -> compress_diagram_internal1 d d3
+          | None -> compress_proof_internal1 p t3
           end
       end
   end in
   begin match result with
   | Some k -> Some k
   | None ->
-      if nj_diagram_type d = nj_diagram_type pd then
-        Some pd
-      else if nj_diagram_type pd = PBot then
-        Some (NJD_ab (nj_diagram_type d,pd))
+      if nj_type t = p then
+        Some t
+      else if nj_type t = PBot then
+        Some (NJ_ab (p,t))
       else
         None
   end
 
-let rec compress_diagram_internal2 d =
-  let d =
-    begin match compress_diagram_internal1 d d with
-    | Some d -> d
-    | None -> d
+let rec compress_proof_internal2 t =
+  let t =
+    begin match compress_proof_internal1 (nj_type t) t with
+    | Some t -> t
+    | None -> t
     end in
-  begin match d with
-  | NJD_var p -> d
-  | NJD_app (p,d1,d2) ->
-      NJD_app (p,
-        compress_diagram_internal2 d1,
-        compress_diagram_internal2 d2)
-  | NJD_abs (p,d1) ->
-      NJD_abs (p,compress_diagram_internal2 d1)
-  | NJD_tt p -> d
-  | NJD_ab (p,d1) ->
-      NJD_ab (p,compress_diagram_internal2 d1)
-  | NJD_conj (p,d1,d2) ->
-      NJD_conj (p,
-        compress_diagram_internal2 d1,
-        compress_diagram_internal2 d2)
-  | NJD_fst (p,d1) ->
-      NJD_fst (p,compress_diagram_internal2 d1)
-  | NJD_snd (p,d1) ->
-      NJD_snd (p,compress_diagram_internal2 d1)
-  | NJD_left (p,d1) ->
-      NJD_left (p,compress_diagram_internal2 d1)
-  | NJD_right (p,d1) ->
-      NJD_right (p,compress_diagram_internal2 d1)
-  | NJD_disj (p,d1,d2,d3) ->
-      NJD_disj (p,
-        compress_diagram_internal2 d1,
-        compress_diagram_internal2 d2,
-        compress_diagram_internal2 d3)
+  begin match t with
+  | NJ_var (_,_) -> t
+  | NJ_app (p,t1,t2) ->
+      NJ_app (p,
+        compress_proof_internal2 t1,
+        compress_proof_internal2 t2)
+  | NJ_abs (p,pa,ta) ->
+      NJ_abs (p,pa,compress_proof_internal2 ta)
+  | NJ_tt -> t
+  | NJ_ab (p,t1) ->
+      NJ_ab (p,compress_proof_internal2 t1)
+  | NJ_conj (p,t1,t2) ->
+      NJ_conj (p,
+        compress_proof_internal2 t1,
+        compress_proof_internal2 t2)
+  | NJ_fst (p,t1) ->
+      NJ_fst (p,compress_proof_internal2 t1)
+  | NJ_snd (p,t1) ->
+      NJ_snd (p,compress_proof_internal2 t1)
+  | NJ_left (p,t1) ->
+      NJ_left (p,compress_proof_internal2 t1)
+  | NJ_right (p,t1) ->
+      NJ_right (p,compress_proof_internal2 t1)
+  | NJ_disj (p,t1,t2,t3) ->
+      NJ_disj (p,
+        compress_proof_internal2 t1,
+        compress_proof_internal2 t2,
+        compress_proof_internal2 t3)
   end
 
-let make_diagram t =
-  let d = make_diagram_internal [] t in
-  compress_diagram_internal2 d
+let postproc_proof t =
+  let t = reduce t in
+  let t = compress_proof_internal2 t in
+  t
 
 type proof_tree =
   | PTassumption of string
@@ -598,85 +703,85 @@ let rec print_proof_tree ppf pt =
       fprintf ppf "\\TrinaryInfC{%s}@," p
   end
 
-let rec nj_diagram_to_proof_tree env d =
-  begin match d with
-  | NJD_var p ->
+let rec nj_diagram_to_proof_tree env t =
+  begin match t with
+  | NJ_var (p,x) ->
       PTassumption (
         Misc.sprintf "[%a]"
           (pp_print_pterm_latex env 5) p
       )
-  | NJD_app (p,d1,d2) ->
+  | NJ_app (p,t1,t2) ->
       PTbinary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\to E$",
-        nj_diagram_to_proof_tree env d1,
-        nj_diagram_to_proof_tree env d2
+        nj_diagram_to_proof_tree env t1,
+        nj_diagram_to_proof_tree env t2
       )
-  | NJD_abs (p,d1) ->
+  | NJ_abs (p,pa,ta) ->
       PTunary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\to I$",
-        nj_diagram_to_proof_tree env d1
+        nj_diagram_to_proof_tree env ta
       )
-  | NJD_tt p ->
+  | NJ_tt ->
       PTaxiom (
         Misc.sprintf "%a"
-          (pp_print_pterm_latex env 5) p,
+          (pp_print_pterm_latex env 5) PTop,
         "$\\top I$"
       )
-  | NJD_ab (p,d1) ->
+  | NJ_ab (p,t1) ->
       PTunary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\bot E$",
-        nj_diagram_to_proof_tree env d1
+        nj_diagram_to_proof_tree env t1
       )
-  | NJD_conj (p,d1,d2) ->
+  | NJ_conj (p,t1,t2) ->
       PTbinary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\land I$",
-        nj_diagram_to_proof_tree env d1,
-        nj_diagram_to_proof_tree env d2
+        nj_diagram_to_proof_tree env t1,
+        nj_diagram_to_proof_tree env t2
       )
-  | NJD_fst (p,d1) ->
+  | NJ_fst (p,t1) ->
       PTunary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\land E_1$",
-        nj_diagram_to_proof_tree env d1
+        nj_diagram_to_proof_tree env t1
       )
-  | NJD_snd (p,d1) ->
+  | NJ_snd (p,t1) ->
       PTunary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\land E_2$",
-        nj_diagram_to_proof_tree env d1
+        nj_diagram_to_proof_tree env t1
       )
-  | NJD_left (p,d1) ->
+  | NJ_left (p,t1) ->
       PTunary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\lor I_1$",
-        nj_diagram_to_proof_tree env d1
+        nj_diagram_to_proof_tree env t1
       )
-  | NJD_right (p,d1) ->
+  | NJ_right (p,t1) ->
       PTunary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\lor I_2$",
-        nj_diagram_to_proof_tree env d1
+        nj_diagram_to_proof_tree env t1
       )
-  | NJD_disj (p,d1,d2,d3) ->
+  | NJ_disj (p,t1,t2,t3) ->
       PTtrinary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\lor E$",
-        nj_diagram_to_proof_tree env d1,
-        nj_diagram_to_proof_tree env d2,
-        nj_diagram_to_proof_tree env d3
+        nj_diagram_to_proof_tree env t1,
+        nj_diagram_to_proof_tree env t2,
+        nj_diagram_to_proof_tree env t3
       )
   end
 

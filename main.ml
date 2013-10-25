@@ -17,10 +17,10 @@ let () =
           Lf_proof.pp_print_proofitem pr;
         eprintf "proof(LF):@,%a@."
           (Lf_proof.pp_print_proof env num t) pr;
-        let npr = Nj_proof.convert_lf num t pr in
+        let npr = Nj_proof.convert_lf t pr in
         eprintf "proof(NJ):@,%a@."
-          Nj_proof.pp_print_lambda npr;
-        let nd = Nj_proof.make_diagram npr in
+          (Nj_proof.pp_print_lambda env) npr;
+        let npr = Nj_proof.postproc_proof npr in
 
         (* printf "%s@." "\\documentclass[preview]{standalone}"; *)
         printf "%s@." "%provable";
@@ -29,7 +29,7 @@ let () =
         printf "%s@." "\\usepackage{color}";
         printf "%s@." "\\begin{document}";
         printf "%a@."
-          (Nj_proof.print_nj_diagram_latex env) nd;
+          (Nj_proof.print_nj_diagram_latex env) npr;
         printf "%s@." "\\end{document}"
     | None ->
         eprintf "solved. unprovable@.";
