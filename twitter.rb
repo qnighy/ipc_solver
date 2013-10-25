@@ -29,7 +29,7 @@ loop do
   end
   if !target
     p ["polling mentions"]
-    sleep 30
+    sleep 60
     next
   end
   p ["processing", target.id]
