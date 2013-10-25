@@ -155,6 +155,48 @@ and reduce2 t =
   | _ -> t
   end
 
+let rec nj_check_type e t =
+  begin match t with
+  | NJ_var (p,x) -> assert (List.nth e x = p); p
+  | NJ_app (p,t1,t2) ->
+      assert (nj_check_type e t1 = PArrow (nj_check_type e t2, p)); p
+  | NJ_abs (p,pa,ta) ->
+      assert (p = PArrow (pa, nj_check_type (pa::e) ta)); p
+  | NJ_tt -> PTop
+  | NJ_ab (p,t1) -> assert (nj_check_type e t1 = PBot); p
+  | NJ_conj (p,t1,t2) ->
+      assert (p = PAnd (nj_check_type e t1, nj_check_type e t2)); p
+  | NJ_fst (p,t1) ->
+      begin match nj_check_type e t1 with
+      | PAnd (t1f,_) -> assert (t1f = p)
+      | _ -> assert false
+      end; p
+  | NJ_snd (p,t1) ->
+      begin match nj_check_type e t1 with
+      | PAnd (_,t1s) -> assert (t1s = p)
+      | _ -> assert false
+      end; p
+  | NJ_left (p,t1) ->
+      begin match p with
+      | POr (t1l,_) -> assert (t1l = nj_check_type e t1)
+      | _ -> assert false
+      end; p
+  | NJ_right (p,t1) ->
+      begin match p with
+      | POr (_,t1r) -> assert (t1r = nj_check_type e t1)
+      | _ -> assert false
+      end; p
+  | NJ_disj (p,t1,t2,t3) ->
+      begin match nj_check_type e t1,nj_check_type e t2,nj_check_type e t3 with
+      | POr (t1l,t1r), PArrow (t2a,t2b), PArrow (t3a,t3b) ->
+          assert (t1l = t2a);
+          assert (t1r = t3a);
+          assert (t2b = p);
+          assert (t3b = p);
+      | _ -> assert false
+      end; p
+  end
+
 let rec convert_lf_internal anum ant sucL sucR pr =
   let debug_data = (* debug *)
   let suc =
@@ -277,7 +319,7 @@ let rec convert_lf_internal anum ant sucL sucR pr =
       | POr (t1,t2) ->
           begin match sucL with
           | None ->
-              let lt = convert_lf_internal anum ant sucL t1 pr in
+              let lt = convert_lf_internal anum ant sucL t2 pr in
               NJ_right (sucR,lt)
           | Some sucLS ->
               let sucRL = PArrow (sucR,sucLS) in
@@ -488,11 +530,11 @@ let rec convert_lf_internal anum ant sucL sucR pr =
                         shift 0 1 lt1,
                         NJ_var (t1,0) (* x *)
                       ),
-                      NJ_abs (PArrow (t2,t3),t2, (* _ : t2 *)
+                      NJ_abs (PArrow (t2,t3),t2, (* y : t2 *)
                         NJ_app (t3,
                           NJ_var (t,anum-1-x+2),
-                          NJ_abs (t12,t1,
-                            NJ_var (t1,1) (* x *)
+                          NJ_abs (t12,t1, (* _ : t1 *)
+                            NJ_var (t2,1) (* y *)
                           )
                         )
                       )

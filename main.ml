@@ -20,7 +20,9 @@ let () =
         let npr = Nj_proof.convert_lf t pr in
         eprintf "proof(NJ):@,%a@."
           (Nj_proof.pp_print_lambda env) npr;
+        Nj_proof.nj_check_type [] npr;
         let npr = Nj_proof.postproc_proof npr in
+        Nj_proof.nj_check_type [] npr;
 
         (* printf "%s@." "\\documentclass[preview]{standalone}"; *)
         printf "%s@." "%provable";
