@@ -591,6 +591,7 @@ let rec convert_lf_internal anum ant sucL sucR pr =
   end
   (* debug *)
   in
+  (*
   eprintf "debug: ";
   List.iter (fun (x,y) ->
     eprintf "%a[%d,%d],@ "
@@ -610,6 +611,7 @@ let rec convert_lf_internal anum ant sucL sucR pr =
   eprintf "proof = %a@," (pp_print_proof_internal empty_env anum 100 ant sucL
   sucR) pr;
   eprintf "output : %a@." (pp_print_lambda empty_env) debug_data;
+  *)
   debug_data
 
 let convert_lf sucR pr =
@@ -749,27 +751,43 @@ let rec print_proof_tree ppf pt =
       fprintf ppf "\\TrinaryInfC{%s}@," p
   end
 
-let rec nj_diagram_to_proof_tree env t =
+let nj_remove_abstraction t =
+  begin match t with
+  | NJ_abs (p,pa,ta) -> ta
+  | _ ->
+      let (p1,p2) =
+        begin match nj_type t with
+        | PArrow (p1,p2) -> (p1,p2)
+        | _ -> assert false
+        end in
+      NJ_app (p2,shift 0 1 t,NJ_var (p1,0))
+  end
+
+let rec nj_make_tree env stack_e stack_n t =
   begin match t with
   | NJ_var (p,x) ->
       PTassumption (
-        Misc.sprintf "[%a]"
+        Misc.sprintf "[%a]$_{%d}$"
           (pp_print_pterm_latex env 5) p
+          (List.nth stack_e x)
       )
   | NJ_app (p,t1,t2) ->
       PTbinary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\to E$",
-        nj_diagram_to_proof_tree env t1,
-        nj_diagram_to_proof_tree env t2
+        nj_make_tree env stack_e stack_n t1,
+        nj_make_tree env stack_e stack_n t2
       )
   | NJ_abs (p,pa,ta) ->
+      let assump_num = 1 + !stack_n in
+      stack_n := assump_num;
+      let stack_e = assump_num :: stack_e in
       PTunary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
-        "$\\to I$",
-        nj_diagram_to_proof_tree env ta
+        Misc.sprintf "$\\to I(%d)$" assump_num,
+        nj_make_tree env stack_e stack_n ta
       )
   | NJ_tt ->
       PTaxiom (
@@ -782,52 +800,55 @@ let rec nj_diagram_to_proof_tree env t =
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\bot E$",
-        nj_diagram_to_proof_tree env t1
+        nj_make_tree env stack_e stack_n t1
       )
   | NJ_conj (p,t1,t2) ->
       PTbinary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\land I$",
-        nj_diagram_to_proof_tree env t1,
-        nj_diagram_to_proof_tree env t2
+        nj_make_tree env stack_e stack_n t1,
+        nj_make_tree env stack_e stack_n t2
       )
   | NJ_fst (p,t1) ->
       PTunary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\land E_1$",
-        nj_diagram_to_proof_tree env t1
+        nj_make_tree env stack_e stack_n t1
       )
   | NJ_snd (p,t1) ->
       PTunary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\land E_2$",
-        nj_diagram_to_proof_tree env t1
+        nj_make_tree env stack_e stack_n t1
       )
   | NJ_left (p,t1) ->
       PTunary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\lor I_1$",
-        nj_diagram_to_proof_tree env t1
+        nj_make_tree env stack_e stack_n t1
       )
   | NJ_right (p,t1) ->
       PTunary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\lor I_2$",
-        nj_diagram_to_proof_tree env t1
+        nj_make_tree env stack_e stack_n t1
       )
   | NJ_disj (p,t1,t2,t3) ->
+      let assump_num = 1 + !stack_n in
+      stack_n := assump_num;
+      let stack_e2 = assump_num :: stack_e in
       PTtrinary (
         Misc.sprintf "%a"
           (pp_print_pterm_latex env 5) p,
-        "$\\lor E$",
-        nj_diagram_to_proof_tree env t1,
-        nj_diagram_to_proof_tree env t2,
-        nj_diagram_to_proof_tree env t3
+        Misc.sprintf "$\\lor E(%d)$" assump_num,
+        nj_make_tree env stack_e stack_n t1,
+        nj_make_tree env stack_e2 stack_n (nj_remove_abstraction t2),
+        nj_make_tree env stack_e2 stack_n (nj_remove_abstraction t3)
       )
   end
 
@@ -859,8 +880,8 @@ and split_proof_tree2 trees number pt =
   else
     (pts,ptn,trees,number)
 
-let print_nj_diagram_latex env ppf d =
-  let pt = nj_diagram_to_proof_tree env d in
+let print_nj_latex env ppf d =
+  let pt = nj_make_tree env [] (ref 0) d in
   let (pts,_,trees,_) = split_proof_tree [] 1 pt in
   let trees = pts::trees in
   List.iter (fun x ->
