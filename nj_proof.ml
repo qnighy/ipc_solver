@@ -155,6 +155,13 @@ and reduce2 t =
   | NJ_disj (p,NJ_right (_,t1),_,t3) -> reduce (NJ_app (p,t3,t1))
   | NJ_disj (p,t1,NJ_abs (_,_,t2),_) when count_fv 0 t2 = 0 -> shift 0 (-1) t2
   | NJ_disj (p,t1,_,NJ_abs (_,_,t3)) when count_fv 0 t3 = 0 -> shift 0 (-1) t3
+  | NJ_disj (p,t1,NJ_abs (_,pa2,t2),NJ_abs (_,pa3,t3)) ->
+      begin match t2,t3 with
+      | NJ_ab (p2,t2x),NJ_ab (p3,t3x) ->
+          NJ_ab (p,NJ_disj (PBot,t1,NJ_abs (PArrow (pa2,PBot),pa2,t2x),NJ_abs
+          (PArrow (pa3,PBot),pa3,t3x)))
+      | _,_ -> t
+      end
   | NJ_conj (p,NJ_fst (_,t1),NJ_snd (_,t2)) when t1 = t2 -> t1
   | _ -> t
   end
