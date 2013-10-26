@@ -664,7 +664,15 @@ let rec compress_proof_internal1 p t =
         None
   end
 
-let rec compress_proof_internal2 t =
+let rec findstack p = function
+  | [] -> raise Not_found
+  | pp::t when pp = p -> 0
+  | h::t -> 1 + findstack p t
+
+let rec compress_proof_internal2 stack t =
+  try
+    NJ_var (nj_type t,findstack (nj_type t) stack)
+  with Not_found ->
   let t =
     begin match compress_proof_internal1 (nj_type t) t with
     | Some t -> t
@@ -674,35 +682,35 @@ let rec compress_proof_internal2 t =
   | NJ_var (_,_) -> t
   | NJ_app (p,t1,t2) ->
       NJ_app (p,
-        compress_proof_internal2 t1,
-        compress_proof_internal2 t2)
+        compress_proof_internal2 stack t1,
+        compress_proof_internal2 stack t2)
   | NJ_abs (p,pa,ta) ->
-      NJ_abs (p,pa,compress_proof_internal2 ta)
+      NJ_abs (p,pa,compress_proof_internal2 (pa::stack) ta)
   | NJ_tt -> t
   | NJ_ab (p,t1) ->
-      NJ_ab (p,compress_proof_internal2 t1)
+      NJ_ab (p,compress_proof_internal2 stack t1)
   | NJ_conj (p,t1,t2) ->
       NJ_conj (p,
-        compress_proof_internal2 t1,
-        compress_proof_internal2 t2)
+        compress_proof_internal2 stack t1,
+        compress_proof_internal2 stack t2)
   | NJ_fst (p,t1) ->
-      NJ_fst (p,compress_proof_internal2 t1)
+      NJ_fst (p,compress_proof_internal2 stack t1)
   | NJ_snd (p,t1) ->
-      NJ_snd (p,compress_proof_internal2 t1)
+      NJ_snd (p,compress_proof_internal2 stack t1)
   | NJ_left (p,t1) ->
-      NJ_left (p,compress_proof_internal2 t1)
+      NJ_left (p,compress_proof_internal2 stack t1)
   | NJ_right (p,t1) ->
-      NJ_right (p,compress_proof_internal2 t1)
+      NJ_right (p,compress_proof_internal2 stack t1)
   | NJ_disj (p,t1,t2,t3) ->
       NJ_disj (p,
-        compress_proof_internal2 t1,
-        compress_proof_internal2 t2,
-        compress_proof_internal2 t3)
+        compress_proof_internal2 stack t1,
+        compress_proof_internal2 stack t2,
+        compress_proof_internal2 stack t3)
   end
 
 let postproc_proof t =
   let t = reduce t in
-  let t = compress_proof_internal2 t in
+  let t = compress_proof_internal2 [] t in
   t
 
 type proof_tree =
