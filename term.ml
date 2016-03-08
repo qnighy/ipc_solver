@@ -74,6 +74,20 @@ let empty_env = {
   dict = Hashtbl.create 10;
   reverse_dict = Hashtbl.create 100
 }
+let colorful_env = {
+  dict = Hashtbl.create 10;
+  reverse_dict = Hashtbl.create 100
+}
+let _ =
+  let r = ref 0 in
+  List.iter (fun kwd ->
+    Hashtbl.add colorful_env.dict kwd (!r);
+    Hashtbl.add colorful_env.reverse_dict (!r) kwd;
+    r := 1 + !r
+  )
+  ["A";"B";"C";"D";"E";"F";"G";"H";"I";"J";"K";"L";"M";"N";"O";"P";"Q";"R";"S";
+   "T";"U";"V";"W";"X";"Y";"Z";"a";"b";"c";"d";"e";"f";"g";"h";"i";"j";"k";"l";
+   "m";"n";"o";"p";"q";"r";"s";"t";"u";"v";"w";"x";"y";"z"]
 
 let rec convert_name_impl env num = function
   | PNVarName s ->
@@ -156,6 +170,45 @@ let rec pp_print_pterm env pr ppf = function
       fprintf ppf "True"
   | PBot ->
       fprintf ppf "False"
+
+let rec pterm_short_string env pr = function
+  | PVar n ->
+      begin try
+        Hashtbl.find env.reverse_dict n
+      with Not_found ->
+        "?" ^ string_of_int n
+      end
+  | PArrow (t,PBot) ->
+      "￢" ^ pterm_short_string env 1 t
+  | PArrow (t1,t2) ->
+      (if pr < 4 then "(" else "") ^
+      pterm_short_string env 3 t1 ^
+      "→" ^
+      pterm_short_string env 4 t2 ^
+      (if pr < 4 then ")" else "")
+  | PAnd (PArrow (t1,t2),PArrow (t2t,t1t))
+        when t1=t1t && t2=t2t ->
+      (if pr < 5 then "(" else "") ^
+      pterm_short_string env 4 t1 ^
+      "⇔" ^
+      pterm_short_string env 4 t2 ^
+      (if pr < 5 then ")" else "")
+  | PAnd (t1,t2) ->
+      (if pr < 2 then "(" else "") ^
+      pterm_short_string env 1 t1 ^
+      "∧" ^
+      pterm_short_string env 2 t2 ^
+      (if pr < 2 then ")" else "")
+  | POr (t1,t2) ->
+      (if pr < 3 then "(" else "") ^
+      pterm_short_string env 2 t1 ^
+      "∨" ^
+      pterm_short_string env 3 t2 ^
+      (if pr < 3 then ")" else "")
+  | PTop ->
+      "⊤"
+  | PBot ->
+      "⊥"
 
 let rec pp_print_pterm_latex_internal env pr ppf = function
   | PVar n ->
