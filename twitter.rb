@@ -5,36 +5,12 @@ require "pstore"
 require "twitter"
 load "./twitter-config.rb"
 
-db = PStore.new("twitter-db")
-
-twitter_client = Twitter::REST::Client.new($twitter_config)
-
-# twitter_client.update_with_media("test 2", File.new("test.png"))
-
-# p twitter_client.mentions_timeline
-
 `test -d workdir || mkdir workdir`
 
-loop do
+$db = PStore.new("twitter-db")
+
+def process_tweet(target)
   begin
-    mt = twitter_client.mentions_timeline
-    target = nil
-    db.transaction do
-      db["read"] ||= {}
-      target = mt.sort_by {|tw|
-        tw.created_at
-      }.find {|tw|
-        !db["read"][tw.id]
-      }
-      if target
-        db["read"][target.id] = {}
-      end
-    end
-    if !target
-      p ["polling mentions"]
-      sleep 60
-      next
-    end
     p ["processing", target.id]
     tid = target.id
     prop = target.text.dup
@@ -76,18 +52,79 @@ loop do
       :in_reply_to_status_id => target.id
     }
     if media
-    twitter_client.update_with_media(result, File.new(media), tw_option)
+    $twitter_client.update_with_media(result, File.new(media), tw_option)
     else
-    twitter_client.update(result, tw_option)
+    $twitter_client.update(result, tw_option)
     end
     p ["done",target.id]
-    sleep 90
   rescue
     p $!
     File.open("twitter-log.txt", "a") do|file|
       file.puts $!.inspect
     end
     sleep 90
+  end
+end
+
+def process_tweets(tweets)
+  success = false
+  begin
+    $db.transaction do
+      target = nil
+      $db["read"] ||= {}
+      target = tweets.sort_by {|tw|
+        tw.created_at
+      }.find {|tw|
+        !$db["read"][tw.id]
+      }
+      if target
+        $db["read"][target.id] = {}
+        process_tweet(target)
+        sleep 10
+        success = true
+      end
+    end
+  rescue
+    p $!
+    File.open("twitter-log.txt", "a") do|file|
+      file.puts $!.inspect
+    end
+  end
+  return success
+end
+
+$twitter_client = Twitter::REST::Client.new($twitter_config)
+$twitter_client_strm = Twitter::Streaming::Client.new($twitter_config)
+
+$self_userid = $twitter_client.user.id
+
+Thread.new do
+  $twitter_client_strm.user(:replies => "all") do|status|
+    p ["processing UserStream"]
+    case status
+    when Twitter::Tweet
+      if status.in_reply_to_user_id == $self_userid
+        Thread.new do
+          process_tweets([status])
+        end
+      end
+    end
+  end
+end
+
+loop do
+  begin
+    p ["polling mentions"]
+    mt = $twitter_client.mentions_timeline
+    while process_tweets(mt) do
+    end
+  rescue
+    p $!
+    File.open("twitter-log.txt", "a") do|file|
+      file.puts $!.inspect
+    end
+  ensure
+    sleep 60
   end
 end
 
