@@ -47,7 +47,7 @@ def process_tweet(target)
         result = "An error occured"
       end
     end
-    result = "@#{target.user.screen_name} #{result} (#{rand(36**5).to_s(36)})"
+    result = ".@#{target.user.screen_name} #{result} (#{rand(36**5).to_s(36)})"
     tw_option = {
       :in_reply_to_status_id => target.id
     }
