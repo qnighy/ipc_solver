@@ -6,3 +6,5 @@
 /parser.ml
 /parser.mli
 /ipc_solver
+
+/twitter-config.rb
