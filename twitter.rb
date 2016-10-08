@@ -10,12 +10,13 @@ load "./twitter-config.rb"
 $db = PStore.new("twitter-db")
 
 def process_tweet(target)
+  target.text.start_with?('@' + $self_screen_name) or return
   begin
     p ["processing", target.id]
     tid = target.id
     prop = target.text.dup
-    prop.gsub!(/@[a-zA-Z0-9_]+/,"")
-    prop.gsub!(/^[.]/,"")
+    prop.sub!('@' + $self_screen_name, "")
+    prop.gsub!(/^\s+/m,"")
     prop.gsub!("&lt;","<")
     prop.gsub!("&gt;",">")
     prop.gsub!("&amp;","&")
@@ -97,6 +98,7 @@ $twitter_client = Twitter::REST::Client.new($twitter_config)
 $twitter_client_strm = Twitter::Streaming::Client.new($twitter_config)
 
 $self_userid = $twitter_client.user.id
+$self_screen_name = $twitter_client.user.screen_name
 
 Thread.new do
   $twitter_client_strm.user(:replies => "all") do|status|
