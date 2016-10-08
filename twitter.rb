@@ -7,6 +7,7 @@ load "./twitter-config.rb"
 
 `test -d workdir || mkdir workdir`
 
+$dblock = Mutex.new
 $db = PStore.new("twitter-db")
 
 def process_tweet(target)
@@ -70,19 +71,21 @@ end
 def process_tweets(tweets)
   success = false
   begin
-    $db.transaction do
-      target = nil
-      $db["read"] ||= {}
-      target = tweets.sort_by {|tw|
-        tw.created_at
-      }.find {|tw|
-        !$db["read"][tw.id]
-      }
-      if target
-        $db["read"][target.id] = {}
-        process_tweet(target)
-        sleep 10
-        success = true
+    $dblock.synchronize do
+      $db.transaction do
+        target = nil
+        $db["read"] ||= {}
+        target = tweets.sort_by {|tw|
+          tw.created_at
+        }.find {|tw|
+          !$db["read"][tw.id]
+        }
+        if target
+          $db["read"][target.id] = {}
+          process_tweet(target)
+          sleep 10
+          success = true
+        end
       end
     end
   rescue
