@@ -10,9 +10,23 @@ load "./twitter-config.rb"
 $dblock = Mutex.new
 $db = PStore.new("twitter-db")
 
+def crush_error(sleep_length=0, &block)
+  block.call()
+rescue
+  message = "[#{Time.now}] #{$!.class}: #{$!.message}\n"
+  $!.backtrace.each do|bt|
+    message << "        #{bt}\n"
+  end
+  print message
+  File.open("twitter-log.txt", "a") do|file|
+    file.print message
+  end
+  sleep(sleep_length)
+end
+
 def process_tweet(target)
   target.text.start_with?('@' + $self_screen_name) or return
-  begin
+  crush_error(90) do
     p ["processing", target.id]
     tid = target.id
     prop = target.text.dup
@@ -55,18 +69,12 @@ def process_tweet(target)
     $twitter_client.update(result, tw_option)
     end
     p ["done",target.id]
-  rescue
-    p $!
-    File.open("twitter-log.txt", "a") do|file|
-      file.puts $!.inspect
-    end
-    sleep 90
   end
 end
 
 def process_tweets(tweets)
   success = false
-  begin
+  crush_error do
     $dblock.synchronize do
       $db.transaction do
         target = nil
@@ -84,11 +92,6 @@ def process_tweets(tweets)
         end
       end
     end
-  rescue
-    p $!
-    File.open("twitter-log.txt", "a") do|file|
-      file.puts $!.inspect
-    end
   end
   return success
 end
@@ -100,13 +103,17 @@ $self_userid = $twitter_client.user.id
 $self_screen_name = $twitter_client.user.screen_name
 
 Thread.new do
-  $twitter_client_strm.user(:replies => "all") do|status|
-    p ["processing UserStream"]
-    case status
-    when Twitter::Tweet
-      if status.in_reply_to_user_id == $self_userid
-        Thread.new do
-          process_tweets([status])
+  loop do
+    crush_error(3600) do
+      $twitter_client_strm.user(:replies => "all") do|status|
+        p ["processing UserStream"]
+        case status
+        when Twitter::Tweet
+          if status.in_reply_to_user_id == $self_userid
+            Thread.new do
+              process_tweets([status])
+            end
+          end
         end
       end
     end
@@ -114,18 +121,12 @@ Thread.new do
 end
 
 loop do
-  begin
+  crush_error do
     p ["polling mentions"]
     mt = $twitter_client.mentions_timeline
     while process_tweets(mt) do
     end
-  rescue
-    p $!
-    File.open("twitter-log.txt", "a") do|file|
-      file.puts $!.inspect
-    end
-  ensure
-    sleep 60
   end
+  sleep 60
 end
 
