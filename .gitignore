@@ -8,3 +8,6 @@
 /ipc_solver
 
 /twitter-config.rb
+/twitter-db
+/twitter-log.txt
+/workdir
