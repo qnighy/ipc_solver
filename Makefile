@@ -8,7 +8,6 @@ SOURCES := \
 	solver.ml \
 	lf_proof.ml \
 	nj_proof.ml \
-	generator.ml \
 	main.ml
 
 RESULT := ipc_solver

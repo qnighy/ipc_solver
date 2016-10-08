@@ -26,28 +26,24 @@ def process_tweet(target)
     end
     result = nil
     media = nil
-    if prop.match(/[pP]roblem|PROBLEM|問題|もんだい/)
-      result = `./ipc_solver --generate`
-    else
-      if system("bash ./twitter-make-image.sh #{tid}")
-        tex = File.read("workdir/#{tid}.tex")
-        if tex.include?("%provable")
-          if File.exists?("workdir/#{tid}1.png")
-            result = "Provable"
-            media = "workdir/#{tid}1.png"
-          else
-            result = "image generation failed"
-          end
-        elsif tex.include?("%unprovable")
-          result = "Unprovable"
-        elsif tex.include?("%parse_error")
-          result = "Parse Error"
+    if system("bash ./twitter-make-image.sh #{tid}")
+      tex = File.read("workdir/#{tid}.tex")
+      if tex.include?("%provable")
+        if File.exists?("workdir/#{tid}1.png")
+          result = "Provable"
+          media = "workdir/#{tid}1.png"
         else
-          result = "Determination failed"
+          result = "image generation failed"
         end
+      elsif tex.include?("%unprovable")
+        result = "Unprovable"
+      elsif tex.include?("%parse_error")
+        result = "Parse Error"
       else
-        result = "An error occured"
+        result = "Determination failed"
       end
+    else
+      result = "An error occured"
     end
     result = ".@#{target.user.screen_name} #{result} (#{rand(36**5).to_s(36)})"
     tw_option = {
