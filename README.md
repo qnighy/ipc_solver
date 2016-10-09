@@ -15,14 +15,27 @@ Propositional Calculus (IPC) is provable or not.
 ```
 $ make
 $ ./ipc_solver <<< "~~(A \/ ~A)"
+$ ./ipc_solver <<< "A \/ ~A"
 ```
 
 ## Usage (LaTeX)
 
-(TODO)
+```
+$ make
+$ ./ipc_solver --latex ipc.tex <<< "~~(A \/ ~A)"
+$ latex ipc.tex
+$ dvipdfmx ipc.dvi
+```
 
 ## Usage (Twitter Bot)
 
-(TODO)
+Please prepare your consumer key, consumer secret, access token, and access token secret.
+
+```
+$ make
+$ cp twitter-config.rb.example twitter-config.rb
+$ vim twitter-config.rb
+$ bundle exec ruby twitter.rb
+```
 
 
