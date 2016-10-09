@@ -41,20 +41,12 @@ def process_tweet(target)
     result = nil
     media = nil
     if system("bash ./twitter-make-image.sh #{tid}")
-      tex = File.read("workdir/#{tid}.tex")
-      if tex.include?("%provable")
-        if File.exists?("workdir/#{tid}1.png")
-          result = "Provable"
-          media = "workdir/#{tid}1.png"
-        else
-          result = "image generation failed"
-        end
-      elsif tex.include?("%unprovable")
-        result = "Unprovable"
-      elsif tex.include?("%parse_error")
-        result = "Parse Error"
-      else
-        result = "Determination failed"
+      result = File.read("workdir/#{tid}.out").strip
+      if result == ""
+        result = "An error occured."
+      end
+      if File.exists?("workdir/#{tid}1.png")
+        media = "workdir/#{tid}1.png"
       end
     else
       result = "An error occured"
@@ -64,9 +56,9 @@ def process_tweet(target)
       :in_reply_to_status_id => target.id
     }
     if media
-    $twitter_client.update_with_media(result, File.new(media), tw_option)
+      $twitter_client.update_with_media(result, File.new(media), tw_option)
     else
-    $twitter_client.update(result, tw_option)
+      $twitter_client.update(result, tw_option)
     end
     p ["done",target.id]
   end

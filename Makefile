@@ -8,6 +8,7 @@ SOURCES := \
 	solver.ml \
 	lf_proof.ml \
 	nj_proof.ml \
+	kripke.mli kripke.ml \
 	main.ml
 
 RESULT := ipc_solver

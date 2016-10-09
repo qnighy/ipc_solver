@@ -8,6 +8,7 @@ Propositional Calculus (IPC) is provable or not.
 ## Dependencies
 
 - OCaml
+- MiniSat executable (for refutation by Kripke models)
 - LaTeX (for drawing proof diagrams)
 
 ## Usage (Command Line)
