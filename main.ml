@@ -127,7 +127,7 @@ let () =
     end
   with
   | Parsing.Parse_error ->
-      eprintf "Parse Error@.";
+      Printf.printf "Parse Error\n";
       begin match !latex_output with
       | Some latex_path ->
           let f = open_out latex_path in
