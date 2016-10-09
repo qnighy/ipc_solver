@@ -81,6 +81,7 @@ rule token =
       | "!" { NOT }
       | "-" { NOT }
       | "￢" { NOT }
+      | "¬" { NOT }
       | "_|_" { BOT }
       | "⊥" { BOT }
       | "0" { BOT }
