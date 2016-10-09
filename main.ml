@@ -1,6 +1,7 @@
 open Term
 open Format
 
+let verbose = ref false
 let latex_output = ref None
 
 let usage_msg =
@@ -12,7 +13,9 @@ let speclist = [
   ("--latex", Arg.String (fun path -> latex_output := Some path),
     "Sets a path for latex output");
   ("--no-latex", Arg.Unit (fun _ -> latex_output := None),
-    "Cancels latex output")
+    "Cancels latex output");
+  ("--verbose", Arg.Set verbose, "Enables verbose output");
+  ("-v", Arg.Set verbose, "Enables verbose output")
 ]
 
 let () =
@@ -20,28 +23,27 @@ let () =
   let lexbuf = Lexing.from_channel stdin in
   begin try
     let tn = Parser.main Lexer.token lexbuf in
-    (* eprintf "Term is %a@." (pp_print_pnterm 5) tn; *)
+    if !verbose then eprintf "Term is %a@." (pp_print_pnterm 5) tn;
     let (t,env,num) = convert_name tn in
-    (* eprintf "Term is %a@." (pp_print_pterm env 5) t; *)
+    if !verbose then eprintf "Term is %a@." (pp_print_pterm env 5) t;
     begin match Solver.solve num t with
     | Some pr ->
         eprintf "solved. provable@.";
         begin match !latex_output with
         | Some latex_path ->
-            (* eprintf "proof(LF, plain): %a@."
-              Lf_proof.pp_print_proofitem pr; *)
-            (* eprintf "proof(LF):@,%a@."
-              (Lf_proof.pp_print_proof env num t) pr; *)
+            if !verbose then eprintf "proof(LF, plain): %a@."
+              Lf_proof.pp_print_proofitem pr;
+            if !verbose then eprintf "proof(LF):@,%a@."
+              (Lf_proof.pp_print_proof env num t) pr;
             let npr = Nj_proof.convert_lf t pr in
-            (* eprintf "proof(NJ):@,%a@."
-              (Nj_proof.pp_print_lambda env) npr; *)
+            if !verbose then eprintf "proof(NJ):@,%a@."
+              (Nj_proof.pp_print_lambda env) npr;
             ignore (Nj_proof.nj_check_type [] npr);
             let npr = Nj_proof.postproc_proof npr in
             ignore (Nj_proof.nj_check_type [] npr);
-            (* eprintf "proof(NJ):@,%a@."
-              (Nj_proof.pp_print_lambda env) npr; *)
+            if !verbose then eprintf "proof(NJ):@,%a@."
+              (Nj_proof.pp_print_lambda env) npr;
 
-            (* printf "%s@." "\\documentclass[preview]{standalone}"; *)
             let f = open_out latex_path in
             let ff = formatter_of_out_channel f in
             fprintf ff "%s@." "%provable";
