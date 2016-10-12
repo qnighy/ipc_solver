@@ -1,5 +1,4 @@
 open Term
-open Format
 open Lf_proof
 
 type nj_proof =
@@ -32,46 +31,46 @@ let abs_over p t = NJ_abs (PArrow (p,nj_type t),p,t)
 
 let rec pp_print_lambda env ppf = function
   | NJ_var (p,x) ->
-      fprintf ppf "@[<1>(%d@ :@ %a)@]@," x
+      Format.fprintf ppf "@[<1>(%d@ :@ %a)@]@," x
         (pp_print_pterm env 0) p
   | NJ_app (p,t1,t2) ->
-      fprintf ppf "@[<1>(%a@ %a@ :@ %a)@]@,"
+      Format.fprintf ppf "@[<1>(%a@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
         (pp_print_lambda env) t2
         (pp_print_pterm env 0) p
   | NJ_abs (p,pa,ta) ->
-      fprintf ppf "@[<1>(\\:%a.@ %a@ :@ %a)@]@,"
+      Format.fprintf ppf "@[<1>(\\:%a.@ %a@ :@ %a)@]@,"
         (pp_print_pterm env 0) pa
         (pp_print_lambda env) ta
         (pp_print_pterm env 0) p
-  | NJ_tt -> fprintf ppf "@[<1>tt@]@,"
+  | NJ_tt -> Format.fprintf ppf "@[<1>tt@]@,"
   | NJ_ab (p,t1) ->
-      fprintf ppf "@[<1>([ab]@ %a@ :@ %a)@]@,"
+      Format.fprintf ppf "@[<1>([ab]@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
         (pp_print_pterm env 0) p
   | NJ_conj (p,t1,t2) ->
-      fprintf ppf "@[<1>([conj]@ %a %a@ :@ %a)@]@,"
+      Format.fprintf ppf "@[<1>([conj]@ %a %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
         (pp_print_lambda env) t2
         (pp_print_pterm env 0) p
   | NJ_fst (p,t1) ->
-      fprintf ppf "@[<1>([fst]@ %a@ :@ %a)@]@,"
+      Format.fprintf ppf "@[<1>([fst]@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
         (pp_print_pterm env 0) p
   | NJ_snd (p,t1) ->
-      fprintf ppf "@[<1>([snd]@ %a@ :@ %a)@]@,"
+      Format.fprintf ppf "@[<1>([snd]@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
         (pp_print_pterm env 0) p
   | NJ_left (p,t1) ->
-      fprintf ppf "@[<1>([left]@ %a@ :@ %a)@]@,"
+      Format.fprintf ppf "@[<1>([left]@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
         (pp_print_pterm env 0) p
   | NJ_right (p,t1) ->
-      fprintf ppf "@[<1>([right]@ %a@ :@ %a)@]@,"
+      Format.fprintf ppf "@[<1>([right]@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
         (pp_print_pterm env 0) p
   | NJ_disj (p,t1,t2,t3) ->
-      fprintf ppf "@[<1>([disj]@ %a@ %a@ %a@ :@ %a)@]@,"
+      Format.fprintf ppf "@[<1>([disj]@ %a@ %a@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
         (pp_print_lambda env) t2
         (pp_print_lambda env) t3
@@ -744,26 +743,26 @@ let pt_prop = function
 let rec print_proof_tree ppf pt =
   begin match pt with
   | PTassumption p ->
-      fprintf ppf "\\AxiomC{%s}@," p
+      Format.fprintf ppf "\\AxiomC{%s}@," p
   | PTaxiom (p,r) ->
-      fprintf ppf "\\AxiomC{}@,";
-      fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
-      fprintf ppf "\\UnaryInfC{%s}@," p
+      Format.fprintf ppf "\\AxiomC{}@,";
+      Format.fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
+      Format.fprintf ppf "\\UnaryInfC{%s}@," p
   | PTunary (p,r,t1) ->
       print_proof_tree ppf t1;
-      fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
-      fprintf ppf "\\UnaryInfC{%s}@," p
+      Format.fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
+      Format.fprintf ppf "\\UnaryInfC{%s}@," p
   | PTbinary (p,r,t1,t2) ->
       print_proof_tree ppf t1;
       print_proof_tree ppf t2;
-      fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
-      fprintf ppf "\\BinaryInfC{%s}@," p
+      Format.fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
+      Format.fprintf ppf "\\BinaryInfC{%s}@," p
   | PTtrinary (p,r,t1,t2,t3) ->
       print_proof_tree ppf t1;
       print_proof_tree ppf t2;
       print_proof_tree ppf t3;
-      fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
-      fprintf ppf "\\TrinaryInfC{%s}@," p
+      Format.fprintf ppf "\\RightLabel{\\scriptsize%s}@," r;
+      Format.fprintf ppf "\\TrinaryInfC{%s}@," p
   end
 
 let nj_remove_abstraction t =
@@ -900,7 +899,7 @@ let print_nj_latex env ppf d =
   let (pts,_,trees,_) = split_proof_tree [] 1 pt in
   let trees = pts::trees in
   List.iter (fun x ->
-    fprintf ppf "%s@." "\\begin{prooftree}";
-    fprintf ppf "%a@." print_proof_tree x;
-    fprintf ppf "%s@.@." "\\end{prooftree}"
+    Format.fprintf ppf "%s@." "\\begin{prooftree}";
+    Format.fprintf ppf "%a@." print_proof_tree x;
+    Format.fprintf ppf "%s@.@." "\\end{prooftree}"
   ) (List.rev trees);
