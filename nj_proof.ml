@@ -165,6 +165,16 @@ and reduce2 t =
   | _ -> t
   end
 
+let rec cutAnt ant id =
+  begin match ant with
+  | [] -> raise (Invalid_argument "cannot find desired proposition in antecedent")
+  | (t,ti)::antt when ti = id ->
+      ([],t,antt)
+  | anth::antt ->
+      let (c0,c1,c2) = cutAnt antt id in
+      (anth::c0,c1,c2)
+  end
+
 let rec nj_check_type e t =
   begin match t with
   | NJ_var (p,x) -> assert (List.nth e x = p); p
