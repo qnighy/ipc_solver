@@ -1,9 +1,9 @@
-type sat_env = {
+type environment = {
   mutable maxvar: int;
   mutable clauses: int array list
 }
 
-let new_sat_env () = {
+let new_environment () = {
   maxvar = 0;
   clauses = []
 }
@@ -26,8 +26,8 @@ let output_clauses sat_env f =
     Printf.fprintf f "0\n"
   ) sat_env.clauses
 
-type sat_result =
-    Satisfiable of bool array
+type result =
+  | Satisfiable of bool array
   | Unsatisfiable
   | NotDetermined
 

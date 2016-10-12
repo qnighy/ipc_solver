@@ -28,17 +28,17 @@ let () =
     if !verbose then eprintf "Term is %a@." (pp_print_pterm env 5) t;
     let solver_result = Solver.solve num t in
     let classical_result = begin match solver_result with
-      | Some _ -> Kripke.KripkeIrrefutable
+      | Some _ -> Kripke.Irrefutable
       | None -> Kripke.solve_n env 1 t end in
     let kripke_result = begin match solver_result, classical_result with
-      | Some _, _ -> Kripke.KripkeIrrefutable
-      | _, Kripke.KripkeIrrefutable -> Kripke.solve env t
+      | Some _, _ -> Kripke.Irrefutable
+      | _, Kripke.Irrefutable -> Kripke.solve env t
       | _, r -> r end in
     let message =
       begin match solver_result, classical_result with
       | Some _, _ -> "Provable."
-      | _, Kripke.KripkeRefutable _ -> "Not provable in intuitionistic logic; not provable in classical logic neither."
-      | _, Kripke.KripkeIrrefutable -> "Not provable in intuitionistic logic; provable in classical logic however."
+      | _, Kripke.Refutable _ -> "Not provable in intuitionistic logic; not provable in classical logic neither."
+      | _, Kripke.Irrefutable -> "Not provable in intuitionistic logic; provable in classical logic however."
       | _, _ -> "Not provable in intuitionistic logic."
       end in
     Printf.printf "%s\n" message;
@@ -73,7 +73,7 @@ let () =
         | None -> ()
         end;
         begin match kripke_result with
-        | Kripke.KripkeRefutable (n, accessibility, term_asgn) ->
+        | Kripke.Refutable (n, accessibility, term_asgn) ->
             if n == 1 then begin
               fprintf ff "%s" "Counterexample: ";
               for i = 0 to (num-1) do
