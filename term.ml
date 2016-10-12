@@ -74,20 +74,6 @@ let empty_env = {
   dict = Hashtbl.create 10;
   reverse_dict = Hashtbl.create 100
 }
-let colorful_env = {
-  dict = Hashtbl.create 10;
-  reverse_dict = Hashtbl.create 100
-}
-let _ =
-  let r = ref 0 in
-  List.iter (fun kwd ->
-    Hashtbl.add colorful_env.dict kwd (!r);
-    Hashtbl.add colorful_env.reverse_dict (!r) kwd;
-    r := 1 + !r
-  )
-  ["A";"B";"C";"D";"E";"F";"G";"H";"I";"J";"K";"L";"M";"N";"O";"P";"Q";"R";"S";
-   "T";"U";"V";"W";"X";"Y";"Z";"a";"b";"c";"d";"e";"f";"g";"h";"i";"j";"k";"l";
-   "m";"n";"o";"p";"q";"r";"s";"t";"u";"v";"w";"x";"y";"z"]
 
 let rec convert_name_impl env num = function
   | PNVarName s ->
