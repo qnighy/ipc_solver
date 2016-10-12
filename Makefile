@@ -7,6 +7,7 @@ SOURCES := \
 	solver.mli solver.ml \
 	lf_proof.mli lf_proof.ml \
 	nj_proof.mli nj_proof.ml \
+	sat.mli sat.ml \
 	kripke.mli kripke.ml \
 	main.ml
 
