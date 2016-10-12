@@ -782,13 +782,13 @@ let rec nj_make_tree env stack_e stack_n t =
   begin match t with
   | NJ_var (p,x) ->
       PTassumption (
-        Misc.sprintf "[%a]$_{%d}$"
+        Format.asprintf "[%a]$_{%d}$"
           (pp_print_pterm_latex env 5) p
           (List.nth stack_e x)
       )
   | NJ_app (p,t1,t2) ->
       PTbinary (
-        Misc.sprintf "%a"
+        Format.asprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\to E$",
         nj_make_tree env stack_e stack_n t1,
@@ -799,27 +799,27 @@ let rec nj_make_tree env stack_e stack_n t =
       stack_n := assump_num;
       let stack_e = assump_num :: stack_e in
       PTunary (
-        Misc.sprintf "%a"
+        Format.asprintf "%a"
           (pp_print_pterm_latex env 5) p,
-        Misc.sprintf "$\\to I(%d)$" assump_num,
+        Format.asprintf "$\\to I(%d)$" assump_num,
         nj_make_tree env stack_e stack_n ta
       )
   | NJ_tt ->
       PTaxiom (
-        Misc.sprintf "%a"
+        Format.asprintf "%a"
           (pp_print_pterm_latex env 5) PTop,
         "$\\top I$"
       )
   | NJ_ab (p,t1) ->
       PTunary (
-        Misc.sprintf "%a"
+        Format.asprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\bot E$",
         nj_make_tree env stack_e stack_n t1
       )
   | NJ_conj (p,t1,t2) ->
       PTbinary (
-        Misc.sprintf "%a"
+        Format.asprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\land I$",
         nj_make_tree env stack_e stack_n t1,
@@ -827,28 +827,28 @@ let rec nj_make_tree env stack_e stack_n t =
       )
   | NJ_fst (p,t1) ->
       PTunary (
-        Misc.sprintf "%a"
+        Format.asprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\land E_1$",
         nj_make_tree env stack_e stack_n t1
       )
   | NJ_snd (p,t1) ->
       PTunary (
-        Misc.sprintf "%a"
+        Format.asprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\land E_2$",
         nj_make_tree env stack_e stack_n t1
       )
   | NJ_left (p,t1) ->
       PTunary (
-        Misc.sprintf "%a"
+        Format.asprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\lor I_1$",
         nj_make_tree env stack_e stack_n t1
       )
   | NJ_right (p,t1) ->
       PTunary (
-        Misc.sprintf "%a"
+        Format.asprintf "%a"
           (pp_print_pterm_latex env 5) p,
         "$\\lor I_2$",
         nj_make_tree env stack_e stack_n t1
@@ -858,9 +858,9 @@ let rec nj_make_tree env stack_e stack_n t =
       stack_n := assump_num;
       let stack_e2 = assump_num :: stack_e in
       PTtrinary (
-        Misc.sprintf "%a"
+        Format.asprintf "%a"
           (pp_print_pterm_latex env 5) p,
-        Misc.sprintf "$\\lor E(%d)$" assump_num,
+        Format.asprintf "$\\lor E(%d)$" assump_num,
         nj_make_tree env stack_e stack_n t1,
         nj_make_tree env stack_e2 stack_n (nj_remove_abstraction t2),
         nj_make_tree env stack_e2 stack_n (nj_remove_abstraction t3)
