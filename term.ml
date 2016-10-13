@@ -99,52 +99,50 @@ type pterm =
   | PBot
 
 type name_env = {
+  mutable maxvar : int;
   dict : (string,int) Hashtbl.t;
   reverse_dict : (int,string) Hashtbl.t
 }
 
 let new_name_env () = {
+  maxvar = 0;
   dict = Hashtbl.create 10;
   reverse_dict = Hashtbl.create 100
 }
-let empty_env = {
-  dict = Hashtbl.create 10;
-  reverse_dict = Hashtbl.create 100
-}
+let empty_env = new_name_env ()
 
-let rec convert_name_impl env num = function
+let rec convert_name_impl env = function
   | PNVarName s ->
       begin try
         PVar (Hashtbl.find env.dict s)
       with Not_found ->
-        let t = PVar !num in
-        Hashtbl.add env.dict s !num;
-        Hashtbl.add env.reverse_dict !num s;
-        num := !num + 1;
+        let t = PVar env.maxvar in
+        Hashtbl.add env.dict s env.maxvar;
+        Hashtbl.add env.reverse_dict env.maxvar s;
+        env.maxvar <- env.maxvar + 1;
         t
       end
   | PNArrow (t1,t2) ->
-      PArrow (convert_name_impl env num t1,
-        convert_name_impl env num t2)
+      PArrow (convert_name_impl env t1,
+        convert_name_impl env t2)
   | PNAnd (PNArrow (t1,t2),PNArrow(t2t,t1t))
       when t1=t1t && t2=t2t ->
-      let ct1 = convert_name_impl env num t1 in
-      let ct2 = convert_name_impl env num t2 in
+      let ct1 = convert_name_impl env t1 in
+      let ct2 = convert_name_impl env t2 in
       PAnd (PArrow (ct1,ct2),PArrow(ct2,ct1))
   | PNAnd (t1,t2) ->
-      PAnd (convert_name_impl env num t1,
-        convert_name_impl env num t2)
+      PAnd (convert_name_impl env t1,
+        convert_name_impl env t2)
   | PNOr (t1,t2) ->
-      POr (convert_name_impl env num t1,
-        convert_name_impl env num t2)
+      POr (convert_name_impl env t1,
+        convert_name_impl env t2)
   | PNTop -> PTop
   | PNBot -> PBot
 
 let convert_name tn =
   let env = new_name_env () in
-  let num = ref 0 in
-  let t = convert_name_impl env num tn in
-  t, env, !num
+  let t = convert_name_impl env tn in
+  t, env
 
 let rec print_pterm_pr env pr pf = function
   | PVar n ->

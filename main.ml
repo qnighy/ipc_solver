@@ -24,9 +24,9 @@ let () =
   begin try
     let tn = Parser.main Lexer.token lexbuf in
     if !verbose then eprintf "Term is %a@." pp_print_pnterm tn;
-    let (t,env,num) = convert_name tn in
+    let (t,env) = convert_name tn in
     if !verbose then eprintf "Term is %a@." (pp_print_pterm env) t;
-    let solver_result = Solver.solve num t in
+    let solver_result = Solver.solve env.maxvar t in
     let classical_result = begin match solver_result with
       | Some _ -> Kripke.Irrefutable
       | None -> Kripke.solve_n env 1 t end in
@@ -53,12 +53,12 @@ let () =
         fprintf ff "%s@." "\\begin{document}";
         fprintf ff "%a:@.@." (pp_print_pterm_latex env 5) t;
         fprintf ff "%s@.@." message;
-        begin match Solver.solve num t with
+        begin match Solver.solve env.maxvar t with
         | Some pr ->
             if !verbose then eprintf "proof(LF, plain): %a@."
               Lf_proof.pp_print_proofitem pr;
             if !verbose then eprintf "proof(LF):@,%a@."
-              (Lf_proof.pp_print_proof env num t) pr;
+              (Lf_proof.pp_print_proof env env.maxvar t) pr;
             let npr = Nj_proof.convert_lf t pr in
             if !verbose then eprintf "proof(NJ):@,%a@."
               (Nj_proof.pp_print_lambda env) npr;
@@ -76,7 +76,7 @@ let () =
         | Kripke.Refutable (n, accessibility, term_asgn) ->
             if n == 1 then begin
               fprintf ff "%s" "Counterexample: ";
-              for i = 0 to (num-1) do
+              for i = 0 to (env.maxvar-1) do
                 if i <> 0 then fprintf ff ", ";
                 fprintf ff "$%a = %d$"
                   (pp_print_pterm_latex_internal env 5) (PVar i)
@@ -103,7 +103,7 @@ let () =
                   end
                 done
               done;
-              for i = 0 to (num-1) do
+              for i = 0 to (env.maxvar-1) do
                 if i <> 0 then fprintf ff ", ";
                 fprintf ff "$%a = \\{"
                   (pp_print_pterm_latex_internal env 5) (PVar i);
