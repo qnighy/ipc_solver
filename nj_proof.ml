@@ -32,49 +32,49 @@ let abs_over p t = NJ_abs (PArrow (p,nj_type t),p,t)
 let rec pp_print_lambda env ppf = function
   | NJ_var (p,x) ->
       Format.fprintf ppf "@[<1>(%d@ :@ %a)@]@," x
-        (pp_print_pterm env 0) p
+        (pp_print_pterm env) p
   | NJ_app (p,t1,t2) ->
       Format.fprintf ppf "@[<1>(%a@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
         (pp_print_lambda env) t2
-        (pp_print_pterm env 0) p
+        (pp_print_pterm env) p
   | NJ_abs (p,pa,ta) ->
       Format.fprintf ppf "@[<1>(\\:%a.@ %a@ :@ %a)@]@,"
-        (pp_print_pterm env 0) pa
+        (pp_print_pterm env) pa
         (pp_print_lambda env) ta
-        (pp_print_pterm env 0) p
+        (pp_print_pterm env) p
   | NJ_tt -> Format.fprintf ppf "@[<1>tt@]@,"
   | NJ_ab (p,t1) ->
       Format.fprintf ppf "@[<1>([ab]@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
-        (pp_print_pterm env 0) p
+        (pp_print_pterm env) p
   | NJ_conj (p,t1,t2) ->
       Format.fprintf ppf "@[<1>([conj]@ %a %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
         (pp_print_lambda env) t2
-        (pp_print_pterm env 0) p
+        (pp_print_pterm env) p
   | NJ_fst (p,t1) ->
       Format.fprintf ppf "@[<1>([fst]@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
-        (pp_print_pterm env 0) p
+        (pp_print_pterm env) p
   | NJ_snd (p,t1) ->
       Format.fprintf ppf "@[<1>([snd]@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
-        (pp_print_pterm env 0) p
+        (pp_print_pterm env) p
   | NJ_left (p,t1) ->
       Format.fprintf ppf "@[<1>([left]@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
-        (pp_print_pterm env 0) p
+        (pp_print_pterm env) p
   | NJ_right (p,t1) ->
       Format.fprintf ppf "@[<1>([right]@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
-        (pp_print_pterm env 0) p
+        (pp_print_pterm env) p
   | NJ_disj (p,t1,t2,t3) ->
       Format.fprintf ppf "@[<1>([disj]@ %a@ %a@ %a@ :@ %a)@]@,"
         (pp_print_lambda env) t1
         (pp_print_lambda env) t2
         (pp_print_lambda env) t3
-        (pp_print_pterm env 0) p
+        (pp_print_pterm env) p
 
 let rec shift i j t =
   begin match t with
@@ -611,18 +611,18 @@ let rec convert_lf_internal anum ant sucL sucR pr =
   eprintf "debug: ";
   List.iter (fun (x,y) ->
     eprintf "%a[%d,%d],@ "
-      (pp_print_pterm empty_env 0) x
+      (pp_print_pterm empty_env) x
       y (anum-1-y)
   ) ant;
   begin match sucL with
   | None ->
       eprintf "@ /@ %d@ |-@ %a@," anum
-        (pp_print_pterm empty_env 0) sucR
+        (pp_print_pterm empty_env) sucR
   | Some sucLS ->
       eprintf "@ /@ %d@ [%a -> %a],@ |-@ %a@," anum
-        (pp_print_pterm empty_env 0) sucR
-        (pp_print_pterm empty_env 0) sucLS
-        (pp_print_pterm empty_env 0) sucR
+        (pp_print_pterm empty_env) sucR
+        (pp_print_pterm empty_env) sucLS
+        (pp_print_pterm empty_env) sucR
   end;
   eprintf "proof = %a@," (pp_print_proof_internal empty_env anum 100 ant sucL
   sucR) pr;

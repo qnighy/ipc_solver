@@ -23,9 +23,9 @@ let () =
   let lexbuf = Lexing.from_channel stdin in
   begin try
     let tn = Parser.main Lexer.token lexbuf in
-    if !verbose then eprintf "Term is %a@." (pp_print_pnterm 5) tn;
+    if !verbose then eprintf "Term is %a@." pp_print_pnterm tn;
     let (t,env,num) = convert_name tn in
-    if !verbose then eprintf "Term is %a@." (pp_print_pterm env 5) t;
+    if !verbose then eprintf "Term is %a@." (pp_print_pterm env) t;
     let solver_result = Solver.solve num t in
     let classical_result = begin match solver_result with
       | Some _ -> Kripke.Irrefutable

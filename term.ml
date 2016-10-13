@@ -6,19 +6,56 @@ type pnterm =
   | PNTop
   | PNBot
 
+let rec print_pnterm_pr pr pf = function
+  | PNVarName s ->
+      Printf.fprintf pf "%s" s
+  | PNArrow (t,PNBot) ->
+      Printf.fprintf pf "~%a"
+        (print_pnterm_pr 1) t
+  | PNArrow (t1,t2) ->
+      if pr < 4 then Printf.fprintf pf "(";
+      Printf.fprintf pf "%a -> %a"
+        (print_pnterm_pr 3) t1
+        (print_pnterm_pr 4) t2;
+      if pr < 4 then Printf.fprintf pf ")"
+  | PNAnd (PNArrow (t1,t2),PNArrow (t2t,t1t))
+        when t1=t1t && t2=t2t ->
+      if pr < 5 then Printf.fprintf pf "(";
+      Printf.fprintf pf "%a <-> %a"
+        (print_pnterm_pr 4) t1
+        (print_pnterm_pr 4) t2;
+      if pr < 5 then Printf.fprintf pf ")"
+  | PNAnd (t1,t2) ->
+      if pr < 2 then Printf.fprintf pf "(";
+      Printf.fprintf pf "%a /\\ %a"
+        (print_pnterm_pr 1) t1
+        (print_pnterm_pr 2) t2;
+      if pr < 2 then Printf.fprintf pf ")"
+  | PNOr (t1,t2) ->
+      if pr < 3 then Printf.fprintf pf "(";
+      Printf.fprintf pf "%a \\/ %a"
+        (print_pnterm_pr 2) t1
+        (print_pnterm_pr 3) t2;
+      if pr < 3 then Printf.fprintf pf ")"
+  | PNTop ->
+      Printf.fprintf pf "True"
+  | PNBot ->
+      Printf.fprintf pf "False"
 
-let rec pp_print_pnterm pr ppf = function
+let print_pnterm = print_pnterm_pr 5
+
+let rec pp_print_pnterm_pr pr ppf = function
   | PNVarName s ->
       Format.fprintf ppf "%s" s
   | PNArrow (t,PNBot) ->
       Format.fprintf ppf "@[~%a@]"
-        (pp_print_pnterm 1) t
+        (pp_print_pnterm_pr 1) t
   | PNArrow (t1,t2) ->
       Format.fprintf ppf "@[";
       if pr < 4 then Format.fprintf ppf "(";
       Format.fprintf ppf "%a@ ->@ %a"
-        (pp_print_pnterm 3) t1
-        (pp_print_pnterm 4) t2;
+        (pp_print_pnterm_pr 3) t1
+        (pp_print_pnterm_pr 4) t2;
       if pr < 4 then Format.fprintf ppf ")";
       Format.fprintf ppf "@]"
   | PNAnd (PNArrow (t1,t2),PNArrow (t2t,t1t))
@@ -26,30 +63,32 @@ let rec pp_print_pnterm pr ppf = function
       Format.fprintf ppf "@[";
       if pr < 5 then Format.fprintf ppf "(";
       Format.fprintf ppf "%a@ <->@ %a"
-        (pp_print_pnterm 4) t1
-        (pp_print_pnterm 4) t2;
+        (pp_print_pnterm_pr 4) t1
+        (pp_print_pnterm_pr 4) t2;
       if pr < 5 then Format.fprintf ppf ")";
       Format.fprintf ppf "@]"
   | PNAnd (t1,t2) ->
       Format.fprintf ppf "@[";
       if pr < 2 then Format.fprintf ppf "(";
       Format.fprintf ppf "%a@ /\\@ %a"
-        (pp_print_pnterm 1) t1
-        (pp_print_pnterm 2) t2;
+        (pp_print_pnterm_pr 1) t1
+        (pp_print_pnterm_pr 2) t2;
       if pr < 2 then Format.fprintf ppf ")";
       Format.fprintf ppf "@]"
   | PNOr (t1,t2) ->
       Format.fprintf ppf "@[";
       if pr < 3 then Format.fprintf ppf "(";
       Format.fprintf ppf "%a@ \\/@ %a"
-        (pp_print_pnterm 2) t1
-        (pp_print_pnterm 3) t2;
+        (pp_print_pnterm_pr 2) t1
+        (pp_print_pnterm_pr 3) t2;
       if pr < 3 then Format.fprintf ppf ")";
       Format.fprintf ppf "@]"
   | PNTop ->
       Format.fprintf ppf "True"
   | PNBot ->
       Format.fprintf ppf "False"
+
+let pp_print_pnterm = pp_print_pnterm_pr 5
 
 type pterm =
   | PVar of int
@@ -107,7 +146,49 @@ let convert_name tn =
   let t = convert_name_impl env num tn in
   t, env, !num
 
-let rec pp_print_pterm env pr ppf = function
+let rec print_pterm_pr env pr pf = function
+  | PVar n ->
+      begin try
+        Printf.fprintf pf "%s" (Hashtbl.find env.reverse_dict n)
+      with Not_found ->
+        Printf.fprintf pf "?%d" n
+      end
+  | PArrow (t,PBot) ->
+      Printf.fprintf pf "~%a"
+        (print_pterm_pr env 1) t
+  | PArrow (t1,t2) ->
+      if pr < 4 then Printf.fprintf pf "(";
+      Printf.fprintf pf "%a -> %a"
+        (print_pterm_pr env 3) t1
+        (print_pterm_pr env 4) t2;
+      if pr < 4 then Printf.fprintf pf ")"
+  | PAnd (PArrow (t1,t2),PArrow (t2t,t1t))
+        when t1=t1t && t2=t2t ->
+      if pr < 5 then Printf.fprintf pf "(";
+      Printf.fprintf pf "%a <-> %a"
+        (print_pterm_pr env 4) t1
+        (print_pterm_pr env 4) t2;
+      if pr < 5 then Printf.fprintf pf ")"
+  | PAnd (t1,t2) ->
+      if pr < 2 then Printf.fprintf pf "(";
+      Printf.fprintf pf "%a /\\ %a"
+        (print_pterm_pr env 1) t1
+        (print_pterm_pr env 2) t2;
+      if pr < 2 then Printf.fprintf pf ")"
+  | POr (t1,t2) ->
+      if pr < 3 then Printf.fprintf pf "(";
+      Printf.fprintf pf "%a \\/ %a"
+        (print_pterm_pr env 2) t1
+        (print_pterm_pr env 3) t2;
+      if pr < 3 then Printf.fprintf pf ")"
+  | PTop ->
+      Printf.fprintf pf "True"
+  | PBot ->
+      Printf.fprintf pf "False"
+
+let print_pterm env = print_pterm_pr env 5
+
+let rec pp_print_pterm_pr env pr ppf = function
   | PVar n ->
       begin try
         Format.fprintf ppf "%s" (Hashtbl.find env.reverse_dict n)
@@ -116,13 +197,13 @@ let rec pp_print_pterm env pr ppf = function
       end
   | PArrow (t,PBot) ->
       Format.fprintf ppf "@[~%a@]"
-        (pp_print_pterm env 1) t
+        (pp_print_pterm_pr env 1) t
   | PArrow (t1,t2) ->
       Format.fprintf ppf "@[";
       if pr < 4 then Format.fprintf ppf "(";
       Format.fprintf ppf "%a@ ->@ %a"
-        (pp_print_pterm env 3) t1
-        (pp_print_pterm env 4) t2;
+        (pp_print_pterm_pr env 3) t1
+        (pp_print_pterm_pr env 4) t2;
       if pr < 4 then Format.fprintf ppf ")";
       Format.fprintf ppf "@]"
   | PAnd (PArrow (t1,t2),PArrow (t2t,t1t))
@@ -130,24 +211,24 @@ let rec pp_print_pterm env pr ppf = function
       Format.fprintf ppf "@[";
       if pr < 5 then Format.fprintf ppf "(";
       Format.fprintf ppf "%a@ <->@ %a"
-        (pp_print_pterm env 4) t1
-        (pp_print_pterm env 4) t2;
+        (pp_print_pterm_pr env 4) t1
+        (pp_print_pterm_pr env 4) t2;
       if pr < 5 then Format.fprintf ppf ")";
       Format.fprintf ppf "@]"
   | PAnd (t1,t2) ->
       Format.fprintf ppf "@[";
       if pr < 2 then Format.fprintf ppf "(";
       Format.fprintf ppf "%a@ /\\@ %a"
-        (pp_print_pterm env 1) t1
-        (pp_print_pterm env 2) t2;
+        (pp_print_pterm_pr env 1) t1
+        (pp_print_pterm_pr env 2) t2;
       if pr < 2 then Format.fprintf ppf ")";
       Format.fprintf ppf "@]"
   | POr (t1,t2) ->
       Format.fprintf ppf "@[";
       if pr < 3 then Format.fprintf ppf "(";
       Format.fprintf ppf "%a@ \\/@ %a"
-        (pp_print_pterm env 2) t1
-        (pp_print_pterm env 3) t2;
+        (pp_print_pterm_pr env 2) t1
+        (pp_print_pterm_pr env 3) t2;
       if pr < 3 then Format.fprintf ppf ")";
       Format.fprintf ppf "@]"
   | PTop ->
@@ -155,44 +236,7 @@ let rec pp_print_pterm env pr ppf = function
   | PBot ->
       Format.fprintf ppf "False"
 
-let rec pterm_short_string env pr = function
-  | PVar n ->
-      begin try
-        Hashtbl.find env.reverse_dict n
-      with Not_found ->
-        "?" ^ string_of_int n
-      end
-  | PArrow (t,PBot) ->
-      "￢" ^ pterm_short_string env 1 t
-  | PArrow (t1,t2) ->
-      (if pr < 4 then "(" else "") ^
-      pterm_short_string env 3 t1 ^
-      "→" ^
-      pterm_short_string env 4 t2 ^
-      (if pr < 4 then ")" else "")
-  | PAnd (PArrow (t1,t2),PArrow (t2t,t1t))
-        when t1=t1t && t2=t2t ->
-      (if pr < 5 then "(" else "") ^
-      pterm_short_string env 4 t1 ^
-      "⇔" ^
-      pterm_short_string env 4 t2 ^
-      (if pr < 5 then ")" else "")
-  | PAnd (t1,t2) ->
-      (if pr < 2 then "(" else "") ^
-      pterm_short_string env 1 t1 ^
-      "∧" ^
-      pterm_short_string env 2 t2 ^
-      (if pr < 2 then ")" else "")
-  | POr (t1,t2) ->
-      (if pr < 3 then "(" else "") ^
-      pterm_short_string env 2 t1 ^
-      "∨" ^
-      pterm_short_string env 3 t2 ^
-      (if pr < 3 then ")" else "")
-  | PTop ->
-      "⊤"
-  | PBot ->
-      "⊥"
+let pp_print_pterm env = pp_print_pterm_pr env 5
 
 let rec pp_print_pterm_latex_internal env pr ppf = function
   | PVar n ->

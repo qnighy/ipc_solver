@@ -92,17 +92,17 @@ let rec pp_print_proof_internal env anum pnum ant sucL sucR ppf pr =
   Format.fprintf ppf "@[<1>{";
   List.iter (fun (x,_) ->
     Format.fprintf ppf "%a,@ "
-      (pp_print_pterm env 0) x
+      (pp_print_pterm env) x
   ) ant;
   begin match sucL with
   | None ->
       Format.fprintf ppf "|-@ %a@ "
-        (pp_print_pterm env 0) sucR
+        (pp_print_pterm env) sucR
   | Some sucLS ->
       Format.fprintf ppf "[%a -> %a],@ |-@ %a@ "
-        (pp_print_pterm env 0) sucR
-        (pp_print_pterm env 0) sucLS
-        (pp_print_pterm env 0) sucR
+        (pp_print_pterm env) sucR
+        (pp_print_pterm env) sucLS
+        (pp_print_pterm env) sucR
   end;
   begin match pr with
   | LF_ax x ->

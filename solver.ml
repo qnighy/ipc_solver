@@ -30,19 +30,19 @@ let debug_sequent name ant1 ant2 sucL sucR =
   if do_debug_sequent then begin
     Format.eprintf "%s: " name;
     List.iter (fun (x,_) -> Format.eprintf "%a, "
-      (Term.pp_print_pterm empty_env 0) x) (List.rev ant2);
+      (Term.pp_print_pterm empty_env) x) (List.rev ant2);
     Format.eprintf ";; ";
     List.iter (fun (x,_) -> Format.eprintf "%a, "
-      (Term.pp_print_pterm empty_env 0) x) ant1;
+      (Term.pp_print_pterm empty_env) x) ant1;
     begin match sucL with
     | None ->
         Format.eprintf "|- %a@."
-          (Term.pp_print_pterm empty_env 0) sucR
+          (Term.pp_print_pterm empty_env) sucR
     | Some sucLS ->
         Format.eprintf " [%a -> %a], |- %a@."
-          (Term.pp_print_pterm empty_env 0) sucR
-          (Term.pp_print_pterm empty_env 0) sucLS
-          (Term.pp_print_pterm empty_env 0) sucR
+          (Term.pp_print_pterm empty_env) sucR
+          (Term.pp_print_pterm empty_env) sucLS
+          (Term.pp_print_pterm empty_env) sucR
     end
   end else ()
 

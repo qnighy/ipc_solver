@@ -6,7 +6,8 @@ type pnterm =
   | PNTop
   | PNBot
 
-val pp_print_pnterm : int -> Format.formatter -> pnterm -> unit
+val print_pnterm : out_channel -> pnterm -> unit
+val pp_print_pnterm : Format.formatter -> pnterm -> unit
 
 
 type pterm =
@@ -25,11 +26,10 @@ type name_env = {
 val new_name_env : unit -> name_env
 val empty_env : name_env
 
-val convert_name_impl : name_env -> int ref -> pnterm -> pterm
 val convert_name : pnterm -> pterm * name_env * int
 
-val pp_print_pterm : name_env -> int -> Format.formatter -> pterm -> unit
-val pterm_short_string : name_env -> int -> pterm -> string
+val print_pterm : name_env -> out_channel -> pterm -> unit
+val pp_print_pterm : name_env -> Format.formatter -> pterm -> unit
 val pp_print_pterm_latex_internal :
   name_env -> int -> Format.formatter -> pterm -> unit
 val pp_print_pterm_latex :
