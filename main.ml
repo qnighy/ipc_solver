@@ -118,7 +118,45 @@ let () =
                 fprintf ff "\\}$"
               done;
               fprintf ff "@.@."
-            end
+            end;
+            fprintf ff "\\begin{tabular}{|r|l|}@.";
+            let visited = Hashtbl.create 771 in
+            let rec visit t =
+              if not (Hashtbl.mem visited t) then begin
+                Hashtbl.add visited t ();
+                begin match t with
+                | PVar _ -> ()
+                | PArrow (t0, t1) -> visit t0; visit t1
+                | POr (t0, t1) -> visit t0; visit t1
+                | PAnd (t0, t1) -> visit t0; visit t1
+                | PTop -> ()
+                | PBot -> ()
+                end;
+                fprintf ff "%a & " (pp_print_pterm_latex env 5) t;
+                if n == 1 then begin
+                  fprintf ff "$%d$"
+                    (if (Hashtbl.find term_asgn t).(0) then 1 else 0)
+                end else begin
+                  fprintf ff "$\\{";
+                  let comma = ref false in
+                  for j = 0 to (n-1) do
+                    if (Hashtbl.find term_asgn t).(j) then begin
+                      if !comma then fprintf ff ", ";
+                      fprintf ff "W_{%d}" j;
+                      comma := true
+                    end
+                  done;
+                  fprintf ff "\\}$"
+                end;
+                fprintf ff " \\\\"
+              end
+            in
+            for i = 0 to (env.maxvar-1) do
+              visit (PVar i)
+            done;
+            visit t;
+            fprintf ff "\\end{tabular}@.";
+            fprintf ff "@.@."
         | _ -> ()
         end;
         fprintf ff "%s@." "\\end{document}";
