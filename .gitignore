@@ -2,6 +2,7 @@
 *.cmo
 ._bcdi/
 ._d/
+/doc/
 /lexer.ml
 /parser.ml
 /parser.mli
