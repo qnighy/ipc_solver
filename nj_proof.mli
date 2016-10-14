@@ -14,6 +14,7 @@ type nj_proof =
   | NJ_right of pterm * nj_proof (* B -> A \/ B *)
   | NJ_disj of pterm * nj_proof * nj_proof * nj_proof (* A \/B -> (A -> C) -> (B -> C) -> C *)
 
+val nj_type : nj_proof -> pterm
 val pp_print_lambda : name_env -> Format.formatter -> nj_proof -> unit
 val nj_check_type : pterm list -> nj_proof -> pterm
 val convert_lf : pterm -> lf_proof -> nj_proof

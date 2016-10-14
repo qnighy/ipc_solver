@@ -1,9 +1,11 @@
 #!/bin/bash
 set -ue
+name=$1; shift
+
 ulimit -St 10
 ulimit -Sf 300000
 ulimit -Sv 512000
 cd workdir
-../ipc_solver --latex $1.tex < $1-prop.txt > $1.out 2>$1.log
-latex -halt-on-error $1.tex >>$1.log 2>&1
-dvipng $1.dvi
+../ipc_solver --latex $name.tex "$@" < $name-prop.txt > $name.out 2>$name.log
+latex -halt-on-error $name.tex >>$name.log 2>&1
+dvipng $name.dvi

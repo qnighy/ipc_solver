@@ -3,6 +3,7 @@ open Format
 
 let verbose = ref false
 let latex_output = ref None
+let haskell_in_latex = ref false
 
 let usage_msg =
   "ipc_solver is a solver for intuitionistic propositional formulas.\n" ^
@@ -14,6 +15,8 @@ let speclist = [
     "Sets a path for latex output");
   ("--no-latex", Arg.Unit (fun _ -> latex_output := None),
     "Cancels latex output");
+  ("--haskell-in-latex", Arg.Set haskell_in_latex,
+    "Outputs Haskell source code in the latex output");
   ("--verbose", Arg.Set verbose, "Enables verbose output");
   ("-v", Arg.Set verbose, "Enables verbose output")
 ]
@@ -50,6 +53,7 @@ let () =
         fprintf ff "%s@." "\\usepackage{bussproofs}";
         fprintf ff "%s@." "\\usepackage{color}";
         fprintf ff "%s@." "\\usepackage{latexsym}";
+        fprintf ff "%s@." "\\usepackage{listings}";
         fprintf ff "%s@." "\\begin{document}";
         fprintf ff "%a:@.@." (pp_print_pterm_latex env 5) t;
         fprintf ff "%s@.@." message;
@@ -68,8 +72,15 @@ let () =
             if !verbose then eprintf "proof(NJ):@,%a@."
               (Nj_proof.pp_print_lambda env) npr;
 
-            fprintf ff "%s@.@." "Proof tree (intuitionistic):";
-            fprintf ff "%a@." (Nj_proof.print_nj_latex env) npr
+            if !haskell_in_latex then begin
+              fprintf ff "Haskell code:@.@.";
+              fprintf ff "\\begin{lstlisting}[language=Haskell]@.";
+              fprintf ff "%s@." (PpHaskell.haskell_of_nj env npr);
+              fprintf ff "\\end{lstlisting}@."
+            end else begin
+              fprintf ff "%s@.@." "Proof tree (intuitionistic):";
+              fprintf ff "%a@." (Nj_proof.print_nj_latex env) npr
+            end
         | None -> ()
         end;
         begin match kripke_result with
