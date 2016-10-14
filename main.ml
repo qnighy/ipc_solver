@@ -44,7 +44,7 @@ let () =
       | _, Kripke.Irrefutable -> "Not provable in intuitionistic logic; provable in classical logic however."
       | _, _ -> "Not provable in intuitionistic logic."
       end in
-    Printf.printf "%s\n" message;
+    Format.printf "%s@." message;
     begin match !latex_output with
     | Some latex_path ->
         let f = open_out latex_path in
@@ -176,7 +176,7 @@ let () =
     end
   with
   | Parsing.Parse_error ->
-      Printf.printf "Parse Error\n";
+      Format.printf "Parse Error@.";
       begin match !latex_output with
       | Some latex_path ->
           let f = open_out latex_path in

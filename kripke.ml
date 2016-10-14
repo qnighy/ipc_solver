@@ -124,20 +124,20 @@ let solve_n penv n t =
   let minisat_result = Sat.invoke_minisat sat_env in
   begin match minisat_result with
   | Sat.Satisfiable asgn ->
-      (* Printf.eprintf "Satisfiable\n"; *)
+      (* Format.eprintf "Satisfiable@."; *)
       (* for x = 1 to sat_env.maxvar do
         if asgn.(x) then
-          Printf.eprintf "%d\n" x
+          Format.eprintf "%d@." x
         else
-          Printf.eprintf "%d\n" (-x)
+          Format.eprintf "%d@." (-x)
       done; *)
       (* Hashtbl.iter (fun t0 varids0 ->
         Format.eprintf "%a = @." (pp_print_pterm penv 5) t0;
-        Printf.eprintf "   [";
+        Format.eprintf "   [";
         Array.iter (fun x ->
-          Printf.eprintf "%d, " (if asgn.(x) then 1 else 0)
+          Format.eprintf "%d, " (if asgn.(x) then 1 else 0)
         ) varids0;
-        Printf.eprintf "]\n"
+        Format.eprintf "]@."
       ) term_memo; *)
       let accessibility = Array.map (fun row ->
         Array.map (fun v -> asgn.(v)) row
@@ -148,10 +148,10 @@ let solve_n penv n t =
       ) term_memo;
       Refutable (n, accessibility, term_asgn)
   | Sat.Unsatisfiable ->
-      (* Printf.eprintf "Unsatisfiable\n"; *)
+      (* Format.eprintf "Unsatisfiable@."; *)
       Irrefutable
   | Sat.NotDetermined ->
-      (* Printf.eprintf "Not determined\n"; *)
+      (* Format.eprintf "Not determined@."; *)
       NotDetermined
   end
 
