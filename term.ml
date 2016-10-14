@@ -178,7 +178,7 @@ let rec pp_print_pterm_latex_internal env pr ppf = function
         when t1=t1t && t2=t2t ->
       Format.fprintf ppf "@[";
       if pr < 5 then Format.fprintf ppf "(";
-      Format.fprintf ppf "%a@ \\iff@ %a"
+      Format.fprintf ppf "%a@ \\leftrightarrow@ %a"
         (pp_print_pterm_latex_internal env 4) t1
         (pp_print_pterm_latex_internal env 4) t2;
       if pr < 5 then Format.fprintf ppf ")";
