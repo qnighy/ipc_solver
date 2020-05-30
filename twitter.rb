@@ -112,28 +112,9 @@ def process_tweets(tweets)
 end
 
 $twitter_client = Twitter::REST::Client.new($twitter_config)
-$twitter_client_strm = Twitter::Streaming::Client.new($twitter_config)
 
 $self_userid = $twitter_client.user.id
 $self_screen_name = $twitter_client.user.screen_name
-
-Thread.new do
-  loop do
-    crush_error(3600) do
-      $twitter_client_strm.user(:replies => "all") do|status|
-        p ["processing UserStream"]
-        case status
-        when Twitter::Tweet
-          if status.in_reply_to_user_id == $self_userid
-            Thread.new do
-              process_tweets([status])
-            end
-          end
-        end
-      end
-    end
-  end
-end
 
 loop do
   crush_error do
