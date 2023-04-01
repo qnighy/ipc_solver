@@ -1,0 +1,5 @@
+[app]
+domain = "mastodon.example"
+
+[user]
+access_token = "foobar"

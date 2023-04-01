@@ -12,3 +12,7 @@
 /twitter-db
 /twitter-log.txt
 /workdir
+
+/mastodon-config.toml
+/mastodon.sqlite3
+/workdir_mastodon
