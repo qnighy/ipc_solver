@@ -16,6 +16,7 @@ module IPCSolver
     STATE_COMPLETED = 1
 
     def start
+      @myself = get_myself
       FileUtils.mkdir_p("workdir_mastodon")
       SQLite3::Database.new("mastodon.sqlite3") do |db|
         setup_database(db)
@@ -49,13 +50,17 @@ module IPCSolver
     def poll_requests(db)
       pending = get_pending_requests(db)
       pending.each do |req|
-        process_request(req)
+        has_reply = get_status_context(req.status_id)["descendants"].any? do |child|
+          child["account"]["id"] == @myself["id"]
+        end
+        process_request(req) unless has_reply
         req.state_cd = STATE_COMPLETED
         update_request_state(db, req)
       end
     end
 
     def process_request(req)
+      $stderr.puts "Responding to #{req.status_id}..."
       tid = req.status_id
       prop = req.text.dup
       prop.sub!(/\A@\w+(@[\-\w.]+)?/, "")
@@ -89,8 +94,6 @@ module IPCSolver
           )
         )
       end
-      p ["media =", media]
-      p ["media_obj =", media_obj]
       create_status(
         result,
         media: media_obj ? [media_obj] : nil,
@@ -113,7 +116,6 @@ module IPCSolver
         media_ids: (media || []).map { |m| m["id"] },
         in_reply_to_id: in_reply_to_id
       }
-      p ["params =", params]
       client.post("/api/v1/statuses", **params) do |req|
         req.headers["Idempotency-Key"] = idempotency_key
       end.body
@@ -134,6 +136,14 @@ module IPCSolver
         end
         opts[:max_id] = notifications.last["id"]
       end
+    end
+
+    def get_myself
+      client.get("/api/v1/accounts/verify_credentials").body
+    end
+
+    def get_status_context(id)
+      client.get("/api/v1/statuses/#{id}/context").body
     end
 
     def client

@@ -2,4 +2,10 @@
 domain = "mastodon.example"
 
 [user]
+# Required permissions:
+# - read:accounts
+# - read:notifications
+# - read:statuses
+# - write:media
+# - write:statuses
 access_token = "foobar"
