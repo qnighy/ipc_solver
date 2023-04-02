@@ -59,20 +59,22 @@ module IPCSolver
     def create_watcher
       query = URI.encode_www_form({
         access_token: access_token,
-        stream: "user"
+        stream: "user:notification"
       })
       this = self
       ws = WebSocket::Client::Simple.connect("wss://#{domain}/api/v1/streaming?#{query}") do |ws|
         ws.on :message do |msg|
-          this.poll_queue&.push({ type: :streaming })
+          case msg.type
+          when :ping
+            ws.send("", type: :pong)
+          when :text
+            this.poll_queue&.push({ type: :streaming })
+          end
         end
         ws.on :error do |e|
           $stderr.puts "WebSocket error: #{e.inspect} / #{e.backtrace}"
         end
       end
-      ws.send(JSON.generate({
-        type: "subscribe"
-      }))
       ws
     end
 
