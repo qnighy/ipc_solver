@@ -2,10 +2,14 @@
 # -*- coding: utf-8 -*-
 
 require "fileutils"
+require "json"
 require "time"
+require "thread"
+require "uri"
 
 require "faraday"
 require "faraday/multipart"
+require "websocket-client-simple"
 require "tomlrb"
 require "nokogiri"
 require "sqlite3"
@@ -14,15 +18,61 @@ module IPCSolver
   class MastodonClient
     STATE_INITIAL = 0
     STATE_COMPLETED = 1
+    POLL_PERIOD = 3 * 60
+
+    attr_reader :poll_queue
 
     def start
       @myself = get_myself
+      @poll_queue = Thread::Queue.new
+      periodic_poller = nil
+      watcher = nil
       FileUtils.mkdir_p("workdir_mastodon")
       SQLite3::Database.new("mastodon.sqlite3") do |db|
         setup_database(db)
-        poll_mentions(db)
-        poll_requests(db)
+        periodic_poller = Thread.start do
+          run_periodic_poller
+        end
+        watcher = create_watcher
+        $stderr.puts "Start polling..."
+        while @poll_queue.pop
+          poll_mentions(db)
+          poll_requests(db)
+        end
       end
+    ensure
+      watcher&.close
+      periodic_poller&.raise Interrupt
+      periodic_poller&.join
+    end
+
+    def run_periodic_poller
+      loop do
+        @poll_queue.push({})
+        sleep POLL_PERIOD
+      end
+    rescue Interrupt
+      # OK
+    end
+
+    def create_watcher
+      query = URI.encode_www_form({
+        access_token: access_token,
+        stream: "user:notification"
+      })
+      this = self
+      ws = WebSocket::Client::Simple.connect("wss://#{domain}/api/v1/streaming?#{query}") do |ws|
+        ws.on :message do |msg|
+          this.poll_queue&.push({})
+        end
+        ws.on :error do |e|
+          $stderr.puts "WebSocket error: #{e.inspect} / #{e.backtrace}"
+        end
+      end
+      ws.send(JSON.generate({
+        type: "subscribe"
+      }))
+      ws
     end
 
     def poll_mentions(db)

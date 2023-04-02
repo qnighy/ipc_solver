@@ -2,6 +2,7 @@ source 'https://rubygems.org'
 
 gem 'faraday', '~> 2.0'
 gem 'faraday-multipart', '~> 1.0'
+gem "websocket-client-simple", "~> 0.6.1"
 
 gem 'sqlite3', '~> 1.6'
 gem 'tomlrb', '~> 2.0'

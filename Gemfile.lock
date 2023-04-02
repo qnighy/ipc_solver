@@ -7,6 +7,7 @@ GEM
     domain_name (0.5.20190701)
       unf (>= 0.0.5, < 1.0.0)
     equalizer (0.0.11)
+    event_emitter (0.2.6)
     faraday (2.7.4)
       faraday-net_http (>= 2.0, < 3.1)
       ruby2_keywords (>= 0.0.4)
@@ -56,6 +57,10 @@ GEM
     unf (0.1.4)
       unf_ext
     unf_ext (0.0.8.2)
+    websocket (1.2.9)
+    websocket-client-simple (0.6.1)
+      event_emitter
+      websocket
 
 PLATFORMS
   x86_64-linux
@@ -67,6 +72,7 @@ DEPENDENCIES
   sqlite3 (~> 1.6)
   tomlrb (~> 2.0)
   twitter (~> 7.0)
+  websocket-client-simple (~> 0.6.1)
 
 BUNDLED WITH
    2.4.10
