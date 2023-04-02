@@ -35,7 +35,8 @@ module IPCSolver
         end
         watcher = create_watcher
         $stderr.puts "Start polling..."
-        while @poll_queue.pop
+        while event = @poll_queue.pop
+          $stderr.puts "Checking mentions (cause: #{event[:type]})"
           poll_mentions(db)
           poll_requests(db)
         end
@@ -48,7 +49,7 @@ module IPCSolver
 
     def run_periodic_poller
       loop do
-        @poll_queue.push({})
+        @poll_queue.push({ type: :periodic })
         sleep POLL_PERIOD
       end
     rescue Interrupt
@@ -63,7 +64,7 @@ module IPCSolver
       this = self
       ws = WebSocket::Client::Simple.connect("wss://#{domain}/api/v1/streaming?#{query}") do |ws|
         ws.on :message do |msg|
-          this.poll_queue&.push({})
+          this.poll_queue&.push({ type: :streaming })
         end
         ws.on :error do |e|
           $stderr.puts "WebSocket error: #{e.inspect} / #{e.backtrace}"
