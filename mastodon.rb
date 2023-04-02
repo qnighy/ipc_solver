@@ -59,7 +59,7 @@ module IPCSolver
     def create_watcher
       query = URI.encode_www_form({
         access_token: access_token,
-        stream: "user:notification"
+        stream: "user"
       })
       this = self
       ws = WebSocket::Client::Simple.connect("wss://#{domain}/api/v1/streaming?#{query}") do |ws|
