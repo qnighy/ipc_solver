@@ -9,7 +9,6 @@ SOURCES := \
 	nj_proof.mli nj_proof.ml \
 	sat.mli sat.ml \
 	kripke.mli kripke.ml \
-	ppHaskell.mli ppHaskell.ml \
 	main.ml
 
 RESULT := ipc_solver

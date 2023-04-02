@@ -36,34 +36,15 @@ def process_tweet(target)
     prop.gsub!("&gt;",">")
     prop.gsub!("&amp;","&")
 
-    haskell_in_latex = false
-    option_error = nil
-    prop.gsub!(/--([-a-zA-Z0-9_]+)(?:=([-a-zA-Z0-9_]+))?/) do|opt|
-      optname = $1
-      optval = $2
-      case optname
-      when "haskell"
-        haskell_in_latex = true
-      else
-        option_error = "Unknown option: #{optname}"
-      end
-      ""
-    end
-
     File.open("workdir/#{tid}-prop.txt", "w") do|t|
       t.write prop
     end
 
     command = ["bash", "./twitter-make-image.sh", "#{tid}"]
-    if haskell_in_latex
-      command << "--haskell-in-latex"
-    end
 
     result = nil
     media = nil
-    if option_error
-      result = option_error
-    elsif system(command.join(" "))
+    if system(command.join(" "))
       result = File.read("workdir/#{tid}.out").strip
       if result == ""
         result = "An error occured."
