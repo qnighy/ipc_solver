@@ -96,6 +96,8 @@ module IPCSolver
       html = m["status"]["content"]
       status_id = m["status"]["id"]
       requester = m["account"]["acct"]
+      return if m["account"]["bot"]
+
       text = Nokogiri::HTML::DocumentFragment.parse(html).text
       create_request(db, status_id: status_id, text: text, requester: requester)
     end
