@@ -11,8 +11,10 @@
 /twitter-config.rb
 /twitter-db
 /twitter-log.txt
+# Files from old version. We may remove the line later
 /workdir
 
 /mastodon-config.toml
 /mastodon.sqlite3
+# Files from old version. We may remove the line later
 /workdir_mastodon

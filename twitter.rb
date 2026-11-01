@@ -1,11 +1,52 @@
 #!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
+require "fileutils"
+require "optparse"
 require "pstore"
+require "tmpdir"
 require "twitter"
-load "./twitter-config.rb" if File.exist?("./twitter-config.rb")
 
-# Reads a secret either from twitter-config.rb or from the environment
+$config_file = nil
+$keep_scratch = false
+OptionParser.new do |opts|
+  opts.banner = "Usage: #{$0} [options]"
+  opts.on("-c", "--config FILE", "Config file (default: ./twitter-config.rb if it exists)") do |v|
+    $config_file = File.expand_path(v)
+  end
+  opts.on("--keep-scratch", "Do not remove per-request scratch directories") do
+    $keep_scratch = true
+  end
+end.parse!
+
+# The default config file is optional; an explicitly given one is not.
+if $config_file
+  load $config_file
+else
+  $config_file = File.expand_path("twitter-config.rb")
+  load $config_file if File.exist?($config_file)
+end
+
+# Persistent state (twitter-db, twitter-log.txt): the first entry of
+# $STATE_DIRECTORY (set by systemd's StateDirectory=), or $PWD.
+$state_dir = File.expand_path(ENV["STATE_DIRECTORY"].to_s.split(":").first || ".")
+
+# Yields a fresh temporary directory, removed afterwards unless
+# --keep-scratch is given.
+def with_scratch_dir(name)
+  dir = Dir.mktmpdir("ipc_solver-twitter-#{name}-")
+  yield dir
+ensure
+  if dir
+    if $keep_scratch
+      puts "Scratch directory kept: #{dir}"
+    else
+      FileUtils.remove_entry(dir)
+    end
+  end
+end
+
+# Reads a secret either from the config file or from the environment
 # variable TWITTER_<KEY>, but not both. Empty values are treated as unset.
 def load_secret(config, key)
   env_name = "TWITTER_#{key.upcase}"
@@ -14,9 +55,9 @@ def load_secret(config, key)
   env_value = ENV[env_name]
   env_value = nil if env_value == ""
   if config_value && env_value
-    raise "#{key} is configured both in twitter-config.rb and in #{env_name}; use only one"
+    raise "#{key} is configured both in #{$config_file} and in #{env_name}; use only one"
   end
-  config_value || env_value || (raise "No #{key} configured (set it in twitter-config.rb or #{env_name})")
+  config_value || env_value || (raise "No #{key} configured (set it in #{$config_file} or #{env_name})")
 end
 
 $twitter_config = [
@@ -26,10 +67,8 @@ $twitter_config = [
   :access_token_secret,
 ].to_h {|key| [key, load_secret($twitter_config || {}, key)] }
 
-`test -d workdir || mkdir workdir`
-
 $dblock = Mutex.new
-$db = PStore.new("twitter-db")
+$db = PStore.new(File.join($state_dir, "twitter-db"))
 
 def crush_error(sleep_length=0, &block)
   block.call()
@@ -39,7 +78,7 @@ rescue
     message << "        #{bt}\n"
   end
   print message
-  File.open("twitter-log.txt", "a") do|file|
+  File.open(File.join($state_dir, "twitter-log.txt"), "a") do|file|
     file.print message
   end
   sleep(sleep_length)
@@ -57,33 +96,35 @@ def process_tweet(target)
     prop.gsub!("&gt;",">")
     prop.gsub!("&amp;","&")
 
-    File.open("workdir/#{tid}-prop.txt", "w") do|t|
-      t.write prop
-    end
-
-    command = ["bash", "./twitter-make-image.sh", "#{tid}"]
-
-    result = nil
-    media = nil
-    if system(command.join(" "))
-      result = File.read("workdir/#{tid}.out").strip
-      if result == ""
-        result = "An error occured."
+    with_scratch_dir(tid) do |scratch_dir|
+      File.open(File.join(scratch_dir, "#{tid}-prop.txt"), "w") do|t|
+        t.write prop
       end
-      if File.exists?("workdir/#{tid}1.png")
-        media = "workdir/#{tid}1.png"
+
+      command = ["bash", File.join(__dir__, "twitter-make-image.sh"), scratch_dir, "#{tid}"]
+
+      result = nil
+      media = nil
+      if system(*command)
+        result = File.read(File.join(scratch_dir, "#{tid}.out")).strip
+        if result == ""
+          result = "An error occured."
+        end
+        if File.exist?(File.join(scratch_dir, "#{tid}1.png"))
+          media = File.join(scratch_dir, "#{tid}1.png")
+        end
+      else
+        result = "An error occured"
       end
-    else
-      result = "An error occured"
-    end
-    result = ".@#{target.user.screen_name} #{result} (#{rand(36**5).to_s(36)})"
-    tw_option = {
-      :in_reply_to_status_id => target.id
-    }
-    if media
-      $twitter_client.update_with_media(result, File.new(media), tw_option)
-    else
-      $twitter_client.update(result, tw_option)
+      result = ".@#{target.user.screen_name} #{result} (#{rand(36**5).to_s(36)})"
+      tw_option = {
+        :in_reply_to_status_id => target.id
+      }
+      if media
+        $twitter_client.update_with_media(result, File.new(media), tw_option)
+      else
+        $twitter_client.update(result, tw_option)
+      end
     end
     p ["done",target.id]
   end

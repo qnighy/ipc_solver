@@ -3,8 +3,10 @@
 
 require "fileutils"
 require "json"
+require "optparse"
 require "time"
 require "thread"
+require "tmpdir"
 require "uri"
 
 require "faraday"
@@ -20,7 +22,12 @@ module IPCSolver
     STATE_COMPLETED = 1
     POLL_PERIOD = 3 * 60
 
-    attr_reader :poll_queue
+    attr_reader :poll_queue, :config_file
+
+    def initialize(config_file: "mastodon-config.toml", keep_scratch: false)
+      @config_file = File.expand_path(config_file)
+      @keep_scratch = keep_scratch
+    end
 
     def start
       validate_config
@@ -28,8 +35,7 @@ module IPCSolver
       @poll_queue = Thread::Queue.new
       periodic_poller = nil
       watcher = nil
-      FileUtils.mkdir_p("workdir_mastodon")
-      SQLite3::Database.new("mastodon.sqlite3") do |db|
+      SQLite3::Database.new(File.join(state_dir, "mastodon.sqlite3")) do |db|
         setup_database(db)
         periodic_poller = Thread.start do
           run_periodic_poller
@@ -122,44 +128,67 @@ module IPCSolver
       prop.sub!(/\A@\w+(@[\-\w.]+)?/, "")
       prop.gsub!(/\A\s+/m, "")
 
-      File.open("workdir_mastodon/#{tid}-prop.txt", "w") do|t|
-        t.write prop
-      end
-
-      command = ["bash", "./mastodon-make-image.sh", "#{tid}"]
-
-      result = nil
-      media = nil
-      if system(command.join(" "))
-        result = File.read("workdir_mastodon/#{tid}.out").strip
-        if result == ""
-          result = "An error occured."
+      with_scratch_dir(tid) do |scratch_dir|
+        File.open(File.join(scratch_dir, "#{tid}-prop.txt"), "w") do|t|
+          t.write prop
         end
-        if File.exist?("workdir_mastodon/#{tid}1.png")
-          media = "workdir_mastodon/#{tid}1.png"
+
+        command = ["bash", File.join(__dir__, "mastodon-make-image.sh"), scratch_dir, "#{tid}"]
+
+        result = nil
+        media = nil
+        if system(*command)
+          result = File.read(File.join(scratch_dir, "#{tid}.out")).strip
+          if result == ""
+            result = "An error occured."
+          end
+          if File.exist?(File.join(scratch_dir, "#{tid}1.png"))
+            media = File.join(scratch_dir, "#{tid}1.png")
+          end
+        else
+          result = "An error occured"
         end
-      else
-        result = "An error occured"
-      end
-      result = "@#{req.requester} #{result}"
-      if media
-        media_obj = create_media(
-          Faraday::Multipart::FilePart.new(
-            media,
-            'image/png'
+        result = "@#{req.requester} #{result}"
+        if media
+          media_obj = create_media(
+            Faraday::Multipart::FilePart.new(
+              media,
+              'image/png'
+            )
           )
+        end
+        create_status(
+          result,
+          media: media_obj ? [media_obj] : nil,
+          idempotency_key: "result-#{tid}",
+          in_reply_to_id: req.status_id
         )
       end
-      create_status(
-        result,
-        media: media_obj ? [media_obj] : nil,
-        idempotency_key: "result-#{tid}",
-        in_reply_to_id: req.status_id
-      )
     end
 
     def config
-      @config ||= Tomlrb.load_file("mastodon-config.toml")
+      @config ||= Tomlrb.load_file(config_file)
+    end
+
+    # Directory holding persistent state (mastodon.sqlite3): the first entry of
+    # $STATE_DIRECTORY (set by systemd's StateDirectory=), or $PWD.
+    def state_dir
+      @state_dir ||= File.expand_path(ENV["STATE_DIRECTORY"].to_s.split(":").first || ".")
+    end
+
+    # Yields a fresh temporary directory, removed afterwards unless
+    # --keep-scratch is given.
+    def with_scratch_dir(name)
+      dir = Dir.mktmpdir("ipc_solver-mastodon-#{name}-")
+      yield dir
+    ensure
+      if dir
+        if @keep_scratch
+          $stderr.puts "Scratch directory kept: #{dir}"
+        else
+          FileUtils.remove_entry(dir)
+        end
+      end
     end
 
     def create_media(file)
@@ -239,7 +268,7 @@ module IPCSolver
       secret("user", "access_token")
     end
 
-    # Reads a secret either from mastodon-config.toml or from the environment
+    # Reads a secret either from the config file or from the environment
     # variable MASTODON_<KEY>, but not both. Empty values are treated as unset.
     def secret(section, key, required: true)
       env_name = "MASTODON_#{key.upcase}"
@@ -248,11 +277,11 @@ module IPCSolver
       env_value = ENV[env_name]
       env_value = nil if env_value == ""
       if config_value && env_value
-        raise "#{key} is configured both in mastodon-config.toml and in #{env_name}; use only one"
+        raise "#{key} is configured both in #{config_file} and in #{env_name}; use only one"
       end
       value = config_value || env_value
       if required && !value
-        raise "No #{key} configured (set #{section}.#{key} in mastodon-config.toml or #{env_name})"
+        raise "No #{key} configured (set #{section}.#{key} in #{config_file} or #{env_name})"
       end
       value
     end
@@ -331,4 +360,14 @@ module IPCSolver
   end
 end
 
-IPCSolver::MastodonClient.new.start
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: #{$0} [options]"
+  opts.on("-c", "--config FILE", "Config file (default: ./mastodon-config.toml)") do |v|
+    options[:config_file] = v
+  end
+  opts.on("--keep-scratch", "Do not remove per-request scratch directories") do
+    options[:keep_scratch] = true
+  end
+end.parse!
+IPCSolver::MastodonClient.new(**options).start

@@ -45,6 +45,15 @@ the environment variables `TWITTER_CONSUMER_KEY`, `TWITTER_CONSUMER_SECRET`,
 configured in exactly one place; `twitter-config.rb` may be omitted entirely
 if all secrets come from the environment.
 
+Command line options:
+
+- `-c`, `--config FILE`: config file (default: `./twitter-config.rb`, which
+  may be absent)
+- `--keep-scratch`: keep the per-request temporary directories for debugging
+
+The state (`twitter-db`, `twitter-log.txt`) is stored in `$STATE_DIRECTORY`
+(as set by systemd's `StateDirectory=`), or in the current directory if unset.
+
 ## Usage (Mastodon Bot)
 
 Please prepare an access token with the permissions listed in `mastodon-config.toml.example`.
@@ -61,5 +70,27 @@ Secrets can be given via the environment variables `MASTODON_ACCESS_TOKEN`,
 `mastodon-config.toml`. Each secret must be configured in at most one place
 (`access_token` is required; `client_key` and `client_secret` are optional).
 Non-secret settings such as `domain` are read from `mastodon-config.toml` only.
+
+Command line options:
+
+- `-c`, `--config FILE`: config file (default: `./mastodon-config.toml`)
+- `--keep-scratch`: keep the per-request temporary directories for debugging
+
+The state (`mastodon.sqlite3`) is stored in `$STATE_DIRECTORY` (as set by
+systemd's `StateDirectory=`), or in the current directory if unset. Each
+request is processed in a fresh temporary directory (under `$TMPDIR`, default
+`/tmp`), which is removed afterwards unless `--keep-scratch` is given.
+
+The `ipc_solver` binary and the `*-make-image.sh` scripts are always looked up
+next to the Ruby script, so the bot can be started from any directory and the
+source tree itself may be read-only (e.g. in the Nix store). For example, as a
+systemd service:
+
+```ini
+[Service]
+StateDirectory=ipc-solver
+PrivateTmp=yes
+ExecStart=/path/to/ruby /path/to/ipc_solver/mastodon.rb --config /etc/ipc-solver/mastodon-config.toml
+```
 
 
