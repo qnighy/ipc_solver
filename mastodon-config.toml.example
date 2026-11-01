@@ -1,5 +1,12 @@
+# Secrets (client_key, client_secret, access_token) can alternatively be
+# given via environment variables MASTODON_CLIENT_KEY, MASTODON_CLIENT_SECRET,
+# and MASTODON_ACCESS_TOKEN. Configure each secret in only one place.
+
 [app]
 domain = "mastodon.example"
+# Optional; not used by the bot at the moment.
+# client_key = ""
+# client_secret = ""
 
 [user]
 # Required permissions:

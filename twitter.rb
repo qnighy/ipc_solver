@@ -3,7 +3,28 @@
 
 require "pstore"
 require "twitter"
-load "./twitter-config.rb"
+load "./twitter-config.rb" if File.exist?("./twitter-config.rb")
+
+# Reads a secret either from twitter-config.rb or from the environment
+# variable TWITTER_<KEY>, but not both. Empty values are treated as unset.
+def load_secret(config, key)
+  env_name = "TWITTER_#{key.upcase}"
+  config_value = config[key]
+  config_value = nil if config_value == ""
+  env_value = ENV[env_name]
+  env_value = nil if env_value == ""
+  if config_value && env_value
+    raise "#{key} is configured both in twitter-config.rb and in #{env_name}; use only one"
+  end
+  config_value || env_value || (raise "No #{key} configured (set it in twitter-config.rb or #{env_name})")
+end
+
+$twitter_config = [
+  :consumer_key,
+  :consumer_secret,
+  :access_token,
+  :access_token_secret,
+].to_h {|key| [key, load_secret($twitter_config || {}, key)] }
 
 `test -d workdir || mkdir workdir`
 

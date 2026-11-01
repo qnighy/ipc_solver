@@ -1,3 +1,6 @@
+# Each secret can alternatively be given via an environment variable
+# (TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET, TWITTER_ACCESS_TOKEN,
+# TWITTER_ACCESS_TOKEN_SECRET). Leave the corresponding entry empty here then.
 $twitter_config = {
   :consumer_key => "",
   :consumer_secret => "",
