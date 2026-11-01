@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 require "fileutils"
+require "logger"
 require "optparse"
 require "pstore"
 require "tmpdir"
@@ -31,6 +32,18 @@ end
 # $STATE_DIRECTORY (set by systemd's StateDirectory=), or $PWD.
 $state_dir = File.expand_path(ENV["STATE_DIRECTORY"].to_s.split(":").first || ".")
 
+$logger = Logger.new($stderr, progname: "twitter", level: ENV["LOG_LEVEL"] || Logger::INFO)
+# Errors are additionally recorded in twitter-log.txt
+$error_logger = Logger.new(File.join($state_dir, "twitter-log.txt"), progname: "twitter", level: Logger::WARN)
+
+def log(severity, message)
+  $logger.add(severity, message)
+  $error_logger.add(severity, message)
+end
+
+# Number of trailing lines of the solver/LaTeX log included in error logs
+LOG_TAIL_LINES = 40
+
 # Yields a fresh temporary directory, removed afterwards unless
 # --keep-scratch is given.
 def with_scratch_dir(name)
@@ -39,7 +52,7 @@ def with_scratch_dir(name)
 ensure
   if dir
     if $keep_scratch
-      puts "Scratch directory kept: #{dir}"
+      $logger.info "Scratch directory kept: #{dir}"
     else
       FileUtils.remove_entry(dir)
     end
@@ -70,24 +83,47 @@ $twitter_config = [
 $dblock = Mutex.new
 $db = PStore.new(File.join($state_dir, "twitter-db"))
 
+def format_exception(e)
+  message = "#{e.class}: #{e.message}"
+  # Twitter::Error carries the API error code and the rate limit
+  if e.is_a?(Twitter::Error)
+    message << " (code #{e.code.inspect}"
+    message << ", rate limit resets at #{e.rate_limit.reset_at}" if e.rate_limit&.reset_at
+    message << ")"
+  end
+  message << "\n" << (e.backtrace || []).map { |bt| "    #{bt}" }.join("\n")
+end
+
 def crush_error(sleep_length=0, &block)
   block.call()
-rescue
-  message = "[#{Time.now}] #{$!.class}: #{$!.message}\n"
-  $!.backtrace.each do|bt|
-    message << "        #{bt}\n"
-  end
-  print message
-  File.open(File.join($state_dir, "twitter-log.txt"), "a") do|file|
-    file.print message
-  end
+rescue => e
+  log(Logger::ERROR, format_exception(e))
   sleep(sleep_length)
+end
+
+# Collects the input, the exit status, and the outputs of
+# twitter-make-image.sh, for diagnosing failures.
+def solver_failure_details(scratch_dir, tid, status)
+  details = +"  exit status: #{status.inspect}\n"
+  ["#{tid}-prop.txt", "#{tid}.out", "#{tid}.log"].each do |name|
+    path = File.join(scratch_dir, name)
+    content =
+      if File.exist?(path)
+        lines = File.read(path).scrub.lines
+        omitted = lines.size > LOG_TAIL_LINES ? "  (#{lines.size - LOG_TAIL_LINES} lines omitted)\n" : ""
+        omitted + lines.last(LOG_TAIL_LINES).map { |l| "    #{l.chomp}\n" }.join
+      else
+        "    (missing)\n"
+      end
+    details << "  #{name}:\n#{content}"
+  end
+  details
 end
 
 def process_tweet(target)
   target.text.start_with?('@' + $self_screen_name) or return
   crush_error(90) do
-    p ["processing", target.id]
+    $logger.info "Processing #{target.id} from @#{target.user.screen_name}: #{target.text.inspect}"
     tid = target.id
     prop = target.text.dup
     prop.sub!('@' + $self_screen_name, "")
@@ -108,25 +144,30 @@ def process_tweet(target)
       if system(*command)
         result = File.read(File.join(scratch_dir, "#{tid}.out")).strip
         if result == ""
+          log(Logger::ERROR, "Solver produced no output for #{tid}\n#{solver_failure_details(scratch_dir, tid, $?)}")
           result = "An error occured."
         end
         if File.exist?(File.join(scratch_dir, "#{tid}1.png"))
           media = File.join(scratch_dir, "#{tid}1.png")
+        else
+          log(Logger::WARN, "No image generated for #{tid}")
         end
       else
+        log(Logger::ERROR, "#{command.join(" ")} failed for #{tid}\n#{solver_failure_details(scratch_dir, tid, $?)}")
         result = "An error occured"
       end
       result = ".@#{target.user.screen_name} #{result} (#{rand(36**5).to_s(36)})"
       tw_option = {
         :in_reply_to_status_id => target.id
       }
-      if media
-        $twitter_client.update_with_media(result, File.new(media), tw_option)
-      else
-        $twitter_client.update(result, tw_option)
-      end
+      tweet =
+        if media
+          $twitter_client.update_with_media(result, File.new(media), tw_option)
+        else
+          $twitter_client.update(result, tw_option)
+        end
+      $logger.info "Replied to #{tid} with #{tweet.id}: #{result.inspect}"
     end
-    p ["done",target.id]
   end
 end
 
@@ -158,10 +199,11 @@ $twitter_client = Twitter::REST::Client.new($twitter_config)
 
 $self_userid = $twitter_client.user.id
 $self_screen_name = $twitter_client.user.screen_name
+$logger.info "Logged in as @#{$self_screen_name}; state directory #{$state_dir}"
 
 loop do
   crush_error do
-    p ["polling mentions"]
+    $logger.debug "Polling mentions"
     mt = $twitter_client.mentions_timeline
     while process_tweets(mt) do
     end

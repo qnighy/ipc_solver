@@ -54,6 +54,10 @@ Command line options:
 The state (`twitter-db`, `twitter-log.txt`) is stored in `$STATE_DIRECTORY`
 (as set by systemd's `StateDirectory=`), or in the current directory if unset.
 
+Logs are written to stderr; warnings and errors are also appended to
+`twitter-log.txt`. Set `LOG_LEVEL` (e.g. `debug`, `info`, `warn`) to change
+the verbosity (default: `info`).
+
 ## Usage (Mastodon Bot)
 
 Please prepare an access token with the permissions listed in `mastodon-config.toml.example`.
@@ -80,6 +84,11 @@ The state (`mastodon.sqlite3`) is stored in `$STATE_DIRECTORY` (as set by
 systemd's `StateDirectory=`), or in the current directory if unset. Each
 request is processed in a fresh temporary directory (under `$TMPDIR`, default
 `/tmp`), which is removed afterwards unless `--keep-scratch` is given.
+
+Logs are written to stderr. Set `LOG_LEVEL` (e.g. `debug`, `info`, `warn`) to
+change the verbosity (default: `info`). When a request fails ("An error
+occured"), the log includes the input, the exit status, and the tail of the
+solver/LaTeX output.
 
 The `ipc_solver` binary and the `*-make-image.sh` scripts are always looked up
 next to the Ruby script, so the bot can be started from any directory and the

@@ -3,6 +3,7 @@
 
 require "fileutils"
 require "json"
+require "logger"
 require "optparse"
 require "time"
 require "thread"
@@ -21,17 +22,22 @@ module IPCSolver
     STATE_INITIAL = 0
     STATE_COMPLETED = 1
     POLL_PERIOD = 3 * 60
+    # Number of trailing lines of the solver/LaTeX log included in error logs
+    LOG_TAIL_LINES = 40
 
-    attr_reader :poll_queue, :config_file
+    attr_reader :poll_queue, :config_file, :logger
 
     def initialize(config_file: "mastodon-config.toml", keep_scratch: false)
       @config_file = File.expand_path(config_file)
       @keep_scratch = keep_scratch
+      @logger = Logger.new($stderr, progname: "mastodon", level: ENV["LOG_LEVEL"] || Logger::INFO)
     end
 
     def start
       validate_config
+      logger.info "Using config #{config_file}, state directory #{state_dir}"
       @myself = get_myself
+      logger.info "Logged in as @#{@myself["acct"]} on #{domain}"
       @poll_queue = Thread::Queue.new
       periodic_poller = nil
       watcher = nil
@@ -41,13 +47,16 @@ module IPCSolver
           run_periodic_poller
         end
         watcher = create_watcher
-        $stderr.puts "Start polling..."
+        logger.info "Start polling..."
         while event = @poll_queue.pop
-          $stderr.puts "Checking mentions (cause: #{event[:type]})"
+          logger.debug "Checking mentions (cause: #{event[:type]})"
           poll_mentions(db)
           poll_requests(db)
         end
       end
+    rescue Exception => e
+      logger.fatal "Terminating due to #{format_exception(e)}" unless e.is_a?(Interrupt)
+      raise
     ensure
       watcher&.close
       periodic_poller&.raise Interrupt
@@ -70,6 +79,12 @@ module IPCSolver
       })
       this = self
       ws = WebSocket::Client::Simple.connect("wss://#{domain}/api/v1/streaming?#{query}") do |ws|
+        ws.on :open do
+          this.logger.info "WebSocket connected"
+        end
+        ws.on :close do |e|
+          this.logger.warn "WebSocket closed#{e ? ": #{e.inspect}" : ""}"
+        end
         ws.on :message do |msg|
           case msg.type
           when :ping
@@ -79,7 +94,7 @@ module IPCSolver
           end
         end
         ws.on :error do |e|
-          $stderr.puts "WebSocket error: #{e.inspect} / #{e.backtrace}"
+          this.logger.error "WebSocket error: #{this.format_exception(e)}"
         end
       end
       ws
@@ -103,10 +118,15 @@ module IPCSolver
       html = m["status"]["content"]
       status_id = m["status"]["id"]
       requester = m["account"]["acct"]
-      return if m["account"]["bot"]
+      if m["account"]["bot"]
+        logger.debug "Ignoring mention #{status_id} from bot @#{requester}"
+        return
+      end
 
       text = Nokogiri::HTML::DocumentFragment.parse(html).text
-      create_request(db, status_id: status_id, text: text, requester: requester)
+      if create_request(db, status_id: status_id, text: text, requester: requester)
+        logger.info "New request #{status_id} from @#{requester}: #{text.inspect}"
+      end
     end
 
     def poll_requests(db)
@@ -115,14 +135,18 @@ module IPCSolver
         has_reply = get_status_context(req.status_id)["descendants"].any? do |child|
           child["account"]["id"] == @myself["id"]
         end
-        process_request(req) unless has_reply
+        if has_reply
+          logger.info "Skipping #{req.status_id}: already replied"
+        else
+          process_request(req)
+        end
         req.state_cd = STATE_COMPLETED
         update_request_state(db, req)
       end
     end
 
     def process_request(req)
-      $stderr.puts "Responding to #{req.status_id}..."
+      logger.info "Responding to #{req.status_id}..."
       tid = req.status_id
       prop = req.text.dup
       prop.sub!(/\A@\w+(@[\-\w.]+)?/, "")
@@ -140,12 +164,16 @@ module IPCSolver
         if system(*command)
           result = File.read(File.join(scratch_dir, "#{tid}.out")).strip
           if result == ""
+            logger.error "Solver produced no output for #{tid}\n#{solver_failure_details(scratch_dir, tid, $?)}"
             result = "An error occured."
           end
           if File.exist?(File.join(scratch_dir, "#{tid}1.png"))
             media = File.join(scratch_dir, "#{tid}1.png")
+          else
+            logger.warn "No image generated for #{tid}"
           end
         else
+          logger.error "#{command.join(" ")} failed for #{tid}\n#{solver_failure_details(scratch_dir, tid, $?)}"
           result = "An error occured"
         end
         result = "@#{req.requester} #{result}"
@@ -157,13 +185,45 @@ module IPCSolver
             )
           )
         end
-        create_status(
+        status = create_status(
           result,
           media: media_obj ? [media_obj] : nil,
           idempotency_key: "result-#{tid}",
           in_reply_to_id: req.status_id
         )
+        logger.info "Replied to #{tid} with #{status["id"]}: #{result.inspect}"
       end
+    rescue StandardError => e
+      logger.error "Failed to respond to #{req.status_id}: #{format_exception(e)}"
+      raise
+    end
+
+    # Collects the input, the exit status, and the outputs of
+    # mastodon-make-image.sh, for diagnosing failures.
+    def solver_failure_details(scratch_dir, tid, status)
+      details = +"  exit status: #{status.inspect}\n"
+      ["#{tid}-prop.txt", "#{tid}.out", "#{tid}.log"].each do |name|
+        path = File.join(scratch_dir, name)
+        content =
+          if File.exist?(path)
+            lines = File.read(path).scrub.lines
+            omitted = lines.size > LOG_TAIL_LINES ? "  (#{lines.size - LOG_TAIL_LINES} lines omitted)\n" : ""
+            omitted + lines.last(LOG_TAIL_LINES).map { |l| "    #{l.chomp}\n" }.join
+          else
+            "    (missing)\n"
+          end
+        details << "  #{name}:\n#{content}"
+      end
+      details
+    end
+
+    def format_exception(e)
+      message = "#{e.class}: #{e.message}"
+      # Faraday errors carry the response from the server
+      if e.respond_to?(:response) && e.response.is_a?(Hash)
+        message << " (HTTP #{e.response[:status]}: #{e.response[:body].to_s[0, 1000]})"
+      end
+      message << "\n" << (e.backtrace || []).map { |bt| "    #{bt}" }.join("\n")
     end
 
     def config
@@ -184,7 +244,7 @@ module IPCSolver
     ensure
       if dir
         if @keep_scratch
-          $stderr.puts "Scratch directory kept: #{dir}"
+          logger.info "Scratch directory kept: #{dir}"
         else
           FileUtils.remove_entry(dir)
         end
@@ -314,6 +374,7 @@ module IPCSolver
         VALUES (?, ?, ?)
         ON CONFLICT (status_id) DO NOTHING;
       SQL
+      db.changes > 0
     end
 
     Request = Struct.new(:id, :status_id, :state_cd, :text, :requester)
