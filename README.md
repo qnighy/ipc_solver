@@ -28,35 +28,57 @@ $ latex ipc.tex
 $ dvipdfmx ipc.dvi
 ```
 
-## Usage (Twitter Bot)
+## Usage (X Bot)
 
-Please prepare your consumer key, consumer secret, access token, and access token secret.
+Requires Ruby 3.4 or later (for the `x` gem).
+
+Create a developer app with the X account the bot runs as, and prepare its API
+key, API key secret, access token, and access token secret (OAuth 1.0a, with
+read and write permissions). Using the app owner's own access token lets the
+mentions timeline be billed as Owned Reads.
 
 ```
 $ make
-$ cp twitter-config.rb.example twitter-config.rb
-$ vim twitter-config.rb
-$ bundle exec ruby twitter.rb
+$ cp x-config.toml.example x-config.toml
+$ vim x-config.toml
+$ bundle exec ruby x.rb
 ```
 
-Instead of writing them in `twitter-config.rb`, each secret can be given via
-the environment variables `TWITTER_CONSUMER_KEY`, `TWITTER_CONSUMER_SECRET`,
-`TWITTER_ACCESS_TOKEN`, and `TWITTER_ACCESS_TOKEN_SECRET`. Each secret must be
-configured in exactly one place; `twitter-config.rb` may be omitted entirely
-if all secrets come from the environment.
+Instead of writing them in `x-config.toml`, each secret can be given via the
+environment variables `X_API_KEY`, `X_API_KEY_SECRET`, `X_ACCESS_TOKEN`, and
+`X_ACCESS_TOKEN_SECRET`. Each secret must be configured in exactly one place;
+`x-config.toml` may be omitted entirely if all secrets come from the
+environment.
+
+The bot polls the mentions timeline every `bot.poll_interval` seconds
+(default: 60) and replies to posts that begin with a mention of the bot.
 
 Command line options:
 
-- `-c`, `--config FILE`: config file (default: `./twitter-config.rb`, which
-  may be absent)
+- `-c`, `--config FILE`: config file (default: `./x-config.toml`, which may be
+  absent)
 - `--keep-scratch`: keep the per-request temporary directories for debugging
+  (they contain post text)
+- `--[no-]redact`: redact post text and solver output from logs (default:
+  `log.redact` in the config file, or on)
 
-The state (`twitter-db`, `twitter-log.txt`) is stored in `$STATE_DIRECTORY`
-(as set by systemd's `StateDirectory=`), or in the current directory if unset.
+The state (`x.sqlite3`) is stored in `$STATE_DIRECTORY` (as set by systemd's
+`StateDirectory=`), or in the current directory if unset.
 
-Logs are written to stderr; warnings and errors are also appended to
-`twitter-log.txt`. Set `LOG_LEVEL` (e.g. `debug`, `info`, `warn`) to change
-the verbosity (default: `info`).
+Data retention:
+
+- Mentions older than `bot.max_age` (default: 1 hour) are ignored, including
+  those that arrived while the bot was down.
+- The text of a post is stored only until it is processed. Each request record
+  (post ID and state) is deleted `bot.retention` (default: 2 hours) after the
+  post was created.
+- Usernames are neither fetched nor stored; replies are threaded by post ID.
+- A request interrupted while being processed (e.g. by a crash) is not retried,
+  to avoid replying twice.
+
+Logs are written to stderr. Set `LOG_LEVEL` (e.g. `debug`, `info`, `warn`) to
+change the verbosity (default: `info`). Unless redaction is disabled, logs
+contain post and user IDs but no post text, solver output, or usernames.
 
 ## Usage (Mastodon Bot)
 

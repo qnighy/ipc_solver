@@ -8,6 +8,9 @@
 /parser.mli
 /ipc_solver
 
+/x-config.toml
+/x.sqlite3
+# Files from the former Twitter bot. We may remove the lines later
 /twitter-config.rb
 /twitter-db
 /twitter-log.txt

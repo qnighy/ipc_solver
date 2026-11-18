@@ -1,0 +1,29 @@
+# Secrets (api_key, api_key_secret, access_token, access_token_secret) can
+# alternatively be given via environment variables X_API_KEY, X_API_KEY_SECRET,
+# X_ACCESS_TOKEN, and X_ACCESS_TOKEN_SECRET. Configure each secret in only one
+# place. This file may be omitted entirely if all secrets come from the
+# environment and the defaults below suit you.
+
+[auth]
+# OAuth 1.0a credentials. The access token should be the one of the account
+# owning the developer app, so that reading mentions is billed as Owned Reads.
+# Required permissions: Read and write.
+api_key = ""
+api_key_secret = ""
+access_token = ""
+access_token_secret = ""
+
+[bot]
+# Mentions older than this (seconds) are ignored.
+# max_age = 3600
+# Requests are deleted from the database this long (seconds) after the post
+# was created; must not be shorter than max_age. The post text itself is
+# deleted as soon as the request is handled.
+# retention = 7200
+# Seconds between polls of the mentions timeline.
+# poll_interval = 60
+
+[log]
+# Keep post text and solver output out of the logs. Can be overridden with
+# --redact / --no-redact.
+# redact = true
