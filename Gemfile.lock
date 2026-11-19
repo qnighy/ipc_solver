@@ -18,6 +18,13 @@ GEM
       uri (>= 0.11.1)
     net-protocol (0.4.0)
       timeout
+    nokogiri (1.19.7)
+      mini_portile2 (~> 2.8.2)
+      racc (~> 1.4)
+    nokogiri (1.19.7-aarch64-linux-gnu)
+      racc (~> 1.4)
+    nokogiri (1.19.7-arm64-darwin)
+      racc (~> 1.4)
     nokogiri (1.19.7-x86_64-linux-gnu)
       racc (~> 1.4)
     racc (1.6.2)
@@ -47,6 +54,9 @@ GEM
       x-core (>= 1.0.0, < 2)
 
 PLATFORMS
+  aarch64-linux
+  arm64-darwin
+  ruby
   x86_64-linux
 
 DEPENDENCIES
