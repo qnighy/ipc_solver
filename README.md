@@ -107,6 +107,13 @@ systemd's `StateDirectory=`), or in the current directory if unset. Each
 request is processed in a fresh temporary directory (under `$TMPDIR`, default
 `/tmp`), which is removed afterwards unless `--keep-scratch` is given.
 
+The bot listens to the streaming API (`/api/v1/streaming/user/notification`)
+and additionally polls notifications every 3 minutes. If the streaming
+connection drops or stays silent for 60 seconds (Mastodon sends a heartbeat
+every 15 seconds), it reconnects with exponential backoff (up to 5 minutes) and
+re-checks notifications missed in between. Failed API calls (e.g. while the
+server is restarting) are logged and retried rather than terminating the bot.
+
 Logs are written to stderr. Set `LOG_LEVEL` (e.g. `debug`, `info`, `warn`) to
 change the verbosity (default: `info`). When a request fails ("An error
 occured"), the log includes the input, the exit status, and the tail of the

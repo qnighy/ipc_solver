@@ -1,7 +1,6 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    event_emitter (0.2.6)
     faraday (2.15.1)
       faraday-net_http (>= 2.0, < 3.6)
       json
@@ -36,10 +35,6 @@ GEM
     tomlrb (2.0.5)
       racc (~> 1.4)
     uri (1.1.2)
-    websocket (1.2.11)
-    websocket-client-simple (0.6.1)
-      event_emitter
-      websocket
     x (1.0.0)
       x-core (= 1.0.0)
       x-resources (= 1.0.0)
@@ -68,7 +63,6 @@ DEPENDENCIES
   nokogiri (~> 1.14)
   sqlite3 (~> 1.6)
   tomlrb (~> 2.0)
-  websocket-client-simple (~> 0.6.1)
   x (~> 1.0)
 
 BUNDLED WITH

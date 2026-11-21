@@ -4,6 +4,7 @@
 require "fileutils"
 require "json"
 require "logger"
+require "net/http"
 require "optparse"
 require "time"
 require "thread"
@@ -12,7 +13,6 @@ require "uri"
 
 require "faraday"
 require "faraday/multipart"
-require "websocket-client-simple"
 require "tomlrb"
 require "nokogiri"
 require "sqlite3"
@@ -22,6 +22,15 @@ module IPCSolver
     STATE_INITIAL = 0
     STATE_COMPLETED = 1
     POLL_PERIOD = 3 * 60
+    # Mastodon's streaming server sends a heartbeat comment every 15 seconds;
+    # if nothing arrives for this long, the connection is considered dead.
+    STREAM_READ_TIMEOUT = 60
+    # Exponential backoff for reconnecting to the streaming API and for
+    # retrying API calls at startup.
+    RETRY_MIN_DELAY = 1
+    RETRY_MAX_DELAY = 5 * 60
+    # A streaming connection that lasted this long resets the backoff.
+    STREAM_STABLE_PERIOD = 60
     # Number of trailing lines of the solver/LaTeX log included in error logs
     LOG_TAIL_LINES = 40
 
@@ -36,31 +45,39 @@ module IPCSolver
     def start
       validate_config
       logger.info "Using config #{config_file}, state directory #{state_dir}"
-      @myself = get_myself
+      @myself = with_retry("verify credentials") { get_myself }
       logger.info "Logged in as @#{@myself["acct"]} on #{domain}"
       @poll_queue = Thread::Queue.new
       periodic_poller = nil
-      watcher = nil
+      streamer = nil
       SQLite3::Database.new(File.join(state_dir, "mastodon.sqlite3")) do |db|
         setup_database(db)
         periodic_poller = Thread.start do
           run_periodic_poller
         end
-        watcher = create_watcher
+        streamer = Thread.start do
+          run_streamer
+        end
         logger.info "Start polling..."
         while event = @poll_queue.pop
           logger.debug "Checking mentions (cause: #{event[:type]})"
-          poll_mentions(db)
-          poll_requests(db)
+          begin
+            poll_mentions(db)
+            poll_requests(db)
+          rescue StandardError => e
+            # E.g. the server is restarting; the next event retries.
+            logger.error "Polling failed: #{format_exception(e)}"
+          end
         end
       end
     rescue Exception => e
       logger.fatal "Terminating due to #{format_exception(e)}" unless e.is_a?(Interrupt)
       raise
     ensure
-      watcher&.close
-      periodic_poller&.raise Interrupt
-      periodic_poller&.join
+      [periodic_poller, streamer].compact.each do |t|
+        t.raise Interrupt
+        t.join
+      end
     end
 
     def run_periodic_poller
@@ -72,32 +89,92 @@ module IPCSolver
       # OK
     end
 
-    def create_watcher
-      query = URI.encode_www_form({
-        access_token: access_token,
-        stream: "user:notification"
-      })
-      this = self
-      ws = WebSocket::Client::Simple.connect("wss://#{domain}/api/v1/streaming?#{query}") do |ws|
-        ws.on :open do
-          this.logger.info "WebSocket connected"
+    # Keeps a streaming connection open, reconnecting with exponential
+    # backoff whenever it fails or goes silent.
+    def run_streamer
+      delay = RETRY_MIN_DELAY
+      loop do
+        connected_at = nil
+        begin
+          stream_notifications do
+            connected_at = Time.now
+            logger.info "Streaming connected"
+            # Catch up on notifications missed while disconnected
+            @poll_queue.push({ type: :stream_connected })
+          end
+        rescue StandardError => e
+          logger.warn "Streaming disconnected: #{e.class}: #{e.message}"
         end
-        ws.on :close do |e|
-          this.logger.warn "WebSocket closed#{e ? ": #{e.inspect}" : ""}"
-        end
-        ws.on :message do |msg|
-          case msg.type
-          when :ping
-            ws.send("", type: :pong)
-          when :text
-            this.poll_queue&.push({ type: :streaming })
+        delay = RETRY_MIN_DELAY if connected_at && Time.now - connected_at >= STREAM_STABLE_PERIOD
+        wait = delay * (0.5 + rand * 0.5)
+        logger.info "Reconnecting to streaming in #{wait.round(1)}s"
+        sleep wait
+        delay = [delay * 2, RETRY_MAX_DELAY].min
+      end
+    rescue Interrupt
+      # OK
+    end
+
+    # Connects to the notification stream (Server-Sent Events), yields once
+    # connected, and returns or raises when the connection ends.
+    def stream_notifications
+      uri = URI("https://#{domain}/api/v1/streaming/user/notification")
+      Net::HTTP.start(
+        uri.host, uri.port,
+        use_ssl: true,
+        open_timeout: 30,
+        read_timeout: STREAM_READ_TIMEOUT
+      ) do |http|
+        req = Net::HTTP::Get.new(uri)
+        req["Authorization"] = "Bearer #{access_token}"
+        req["Accept"] = "text/event-stream"
+        http.request(req) do |res|
+          unless res.is_a?(Net::HTTPSuccess)
+            raise "HTTP #{res.code} #{res.message}: #{res.body.to_s[0, 1000]}"
+          end
+
+          yield
+          buf = +""
+          event = nil
+          res.read_body do |chunk|
+            buf << chunk
+            while (i = buf.index("\n"))
+              line = buf.slice!(0..i).chomp
+              if line.empty?
+                # End of an event
+                if event
+                  logger.debug "Streaming event: #{event}"
+                  @poll_queue.push({ type: :streaming })
+                end
+                event = nil
+              elsif line.start_with?(":")
+                # Comment (heartbeat)
+              elsif line.start_with?("event:")
+                event = line.delete_prefix("event:").strip
+              end
+            end
           end
         end
-        ws.on :error do |e|
-          this.logger.error "WebSocket error: #{this.format_exception(e)}"
-        end
       end
-      ws
+      raise EOFError, "stream closed by server"
+    end
+
+    # Calls the block until it succeeds, with exponential backoff (e.g. while
+    # the server is restarting).
+    def with_retry(what)
+      delay = RETRY_MIN_DELAY
+      begin
+        yield
+      rescue Faraday::UnauthorizedError, Faraday::ForbiddenError
+        # A bad token won't fix itself
+        raise
+      rescue StandardError => e
+        wait = delay * (0.5 + rand * 0.5)
+        logger.warn "Failed to #{what} (retrying in #{wait.round(1)}s): #{e.class}: #{e.message}"
+        sleep wait
+        delay = [delay * 2, RETRY_MAX_DELAY].min
+        retry
+      end
     end
 
     def poll_mentions(db)
@@ -300,6 +377,8 @@ module IPCSolver
         conn.request :url_encoded
         conn.response :json
         conn.response :raise_error
+        conn.options.open_timeout = 30
+        conn.options.timeout = 120
       end
     end
 
